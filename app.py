@@ -188,7 +188,7 @@ def display_area_analysis():
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
     st.markdown("---")
-    st.header("📍 Area Analysis")
+    st.header("📍 Area & Outlet Analysis")
 
     df = st.session_state["main_df"]
     
