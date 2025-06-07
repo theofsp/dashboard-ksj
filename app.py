@@ -3,11 +3,21 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import io # PENAMBAHAN FITUR: Library untuk proses export
 
 # --- INITIAL SETUP ---
 st.set_page_config(page_title="KSJ Data 2025", layout="wide")
 
 # --- UTILITY FUNCTIONS ---
+
+# PENAMBAHAN FITUR: Fungsi untuk mengonversi DataFrame ke format Excel di memori
+def to_excel(df: pd.DataFrame):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    processed_data = output.getvalue()
+    return processed_data
+
 def check_login(username, password):
     if username == "Blitz" and password == "ksj2025":
         st.session_state["logged_in"] = True
@@ -32,7 +42,6 @@ def set_view(view_name):
 # --- DATA LOADING ---
 @st.cache_data
 def load_and_process_main_data():
-    # REVISI: Menghapus logika Parquet, kembali ke Excel sebagai satu-satunya sumber.
     st.warning("If the performance feels slow, please leave this page idle for about 10–15 seconds while the system loads the data :)")
     df = pd.read_excel("KSJ Data 2025.xlsx")
 
@@ -134,7 +143,7 @@ def display_grup_1():
         total_rows = len(filtered_df)
         total_pages = (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0)
         
-        prev_col, mid_col, next_col = st.columns([1, 2, 1])
+        prev_col, mid_col, next_col = st.columns([2, 3, 2])
 
         with prev_col:
             if st.button("⬅️ Previous Page", use_container_width=True, disabled=(st.session_state.page_number == 0)):
@@ -142,14 +151,21 @@ def display_grup_1():
                 st.rerun()
 
         with mid_col:
-            # Cegah error jika total_pages = 0
-            display_page_number = st.session_state.page_number + 1 if total_pages > 0 else 0
-            st.markdown(f"<div style='text-align: center;'>Page {display_page_number} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: center; margin-top: 1rem;'>Page {st.session_state.page_number + 1} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
 
         with next_col:
             if st.button("Next Page ➡️", use_container_width=True, disabled=(st.session_state.page_number >= total_pages - 1)):
                 st.session_state.page_number += 1
                 st.rerun()
+
+        # PENAMBAHAN FITUR: Tombol Export untuk tabel "All Data"
+        st.download_button(
+             label="📥 Export All Data to Excel",
+             data=to_excel(filtered_df), # Menggunakan keseluruhan filtered_df, bukan hanya per halaman
+             file_name=f"all_data_export_filtered.xlsx",
+             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             use_container_width=True
+         )
 
         start_index = st.session_state.page_number * PAGE_SIZE
         end_index = start_index + PAGE_SIZE
@@ -168,6 +184,7 @@ def display_grup_1():
     else:
         st.info("No data to display for the selected filters.")
         
+    # Grafik tetap menggunakan filtered_df utuh
     st.subheader("📈 Week-on-Week Productivity")
     if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
         if not filtered_df.empty:
@@ -221,6 +238,15 @@ def display_grup_2():
     summary_df = df.groupby('week').agg(ksj_revenue=('selling', 'sum'),blitz_revenue=('revenue', 'sum'),active_sellers=('ridername', 'nunique'),total_cups=('cups', 'sum')).reset_index()
     display_summary_df = summary_df.rename(columns={'week': 'Week', 'ksj_revenue': "KSJ's Revenue", 'blitz_revenue': "Blitz's Revenue",'active_sellers': 'Active Sellers', 'total_cups': 'Total Cups'})
     st.dataframe(display_summary_df.style.format({"KSJ's Revenue": "Rp {:,.0f}","Blitz's Revenue": "Rp {:,.0f}"}),use_container_width=True, hide_index=True)
+    
+    # PENAMBAHAN FITUR: Tombol Export untuk "Weekly Performance"
+    st.download_button(
+        label="📥 Export Weekly Performance to Excel",
+        data=to_excel(display_summary_df),
+        file_name="weekly_performance_summary.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
     st.markdown("---")
 
     st.subheader("Business Summary")
@@ -234,6 +260,7 @@ def display_grup_2():
     st.markdown("---")
 
     st.subheader("Business Position")
+    # ... (kode business position tetap sama) ...
     if 'date' not in df.columns or 'week' not in df.columns:
         st.warning("Kolom 'date' atau 'week' tidak ditemukan untuk analisis posisi bisnis.")
         return 
@@ -308,6 +335,15 @@ def display_grup_2():
     retention_df = calculate_seller_retention(df)
     if retention_df is not None and not retention_df.empty:
         st.dataframe(retention_df.style.format({"Retention Rate (%)": "{:.2f}%"}), use_container_width=True, hide_index=True)
+        
+        # PENAMBAHAN FITUR: Tombol Export untuk "Seller Retention"
+        st.download_button(
+            label="📥 Export Seller Retention to Excel",
+            data=to_excel(retention_df),
+            file_name="seller_retention_analysis.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
         fig_retention = px.line(retention_df, x='Week', y='Retention Rate (%)', title='Seller Retention Rate Over Time', markers=True)
         fig_retention.update_layout(yaxis_ticksuffix="%")
         st.plotly_chart(fig_retention, use_container_width=True)
@@ -362,6 +398,7 @@ def display_area_analysis():
         return
 
     st.subheader("Performance Summary for Selection")
+    # ... (kode performance summary tetap sama) ...
     total_revenue = df_filtered['revenue'].sum()
     total_cups = df_filtered['cups'].sum()
     active_sellers = df_filtered['ridername'].nunique()
@@ -370,11 +407,12 @@ def display_area_analysis():
     kpi_cols[1].metric("Total Cups Sold", f"{total_cups:,}")
     kpi_cols[2].metric("Total Active Sellers", f"{active_sellers:,}")
     st.markdown("---")
-    
+
     st.subheader("Performance Breakdown")
+    # ... (kode performance breakdown tetap sama) ...
     chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet', 'cups': 'Cups Sold'}
     col_revenue_chart, col_cups_chart = st.columns(2)
-
+    # ... (kode di dalam kolom chart tetap sama) ...
     with col_revenue_chart:
         if selected_outlet != 'All Outlets':
             data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
@@ -410,9 +448,10 @@ def display_area_analysis():
             data_to_plot = df_filtered.groupby('area')['cups'].sum().reset_index().sort_values('cups', ascending=False)
             fig = px.bar(data_to_plot, x='area', y='cups', title="Overall Cups Sold by Area", labels=chart_labels)
         st.plotly_chart(fig, use_container_width=True)
-    
+
     st.markdown("---")
     st.subheader("District Productivity Ranking")
+    # ... (kode district productivity ranking tetap sama) ...
     district_summary = df_filtered.groupby('district').agg(total_revenue=('revenue', 'sum'),total_cups=('cups', 'sum')).reset_index()
     if not district_summary.empty:
         rank_labels={'total_revenue': 'Total Revenue', 'total_cups': 'Total Cups', 'district': 'District'}
@@ -460,6 +499,15 @@ def display_area_analysis():
             use_container_width=True, hide_index=True,
             column_config={"Avg Daily Demand": st.column_config.NumberColumn(format="%.2f"), "Ratio": st.column_config.NumberColumn(format="%.4f")}
         )
+
+        # PENAMBAHAN FITUR: Tombol Export untuk "Supply vs Demand"
+        st.download_button(
+            label="📥 Export Supply vs Demand to Excel",
+            data=to_excel(final_sd_df),
+            file_name="outlet_supply_demand_analysis.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
         fig_sd = px.scatter(
             final_sd_df, x="demand", y="supply", hover_name="outlet", color="status",
             title="Supply (Sellers) vs. Average Daily Demand (Cups) per Outlet",
@@ -493,7 +541,6 @@ else:
         with st.spinner("Processing Your Data. Please wait... :)"):
             st.session_state["main_df"] = load_and_process_main_data()
             
-    # Inisialisasi state paginasi di awal setelah login
     if 'page_number' not in st.session_state:
         st.session_state.page_number = 0
             
