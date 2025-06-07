@@ -77,18 +77,15 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    # REVISI 2: Logika filter dirombak total untuk memperbaiki semua masalah
     if 'grup1_filters' not in st.session_state:
         st.session_state.grup1_filters = {}
-        # Inisialisasi daftar OPSI filter
         st.session_state.grup1_filter_options = {}
         for col in df.columns:
-            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200: # Naikkan limit sedikit jika perlu
+            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200:
                 options = sorted(df[col].dropna().unique())
                 st.session_state.grup1_filter_options[col] = options
-                st.session_state.grup1_filters[col] = options # Defaultnya pilih semua
+                st.session_state.grup1_filters[col] = options
 
-    # Fungsi helper untuk tombol Select All / Clear
     def select_all(filter_key):
         st.session_state.grup1_filters[filter_key] = st.session_state.grup1_filter_options[filter_key]
 
@@ -110,7 +107,6 @@ def display_grup_1():
                     key=f"multiselect_{col}_g1"
                 )
                 
-                # REVISI 2: Mengembalikan tombol Select All / Clear dengan metode stabil
                 c1, c2 = st.columns(2)
                 with c1:
                     st.button("Select All", key=f"all_{col}", on_click=select_all, args=[col], use_container_width=True)
@@ -119,19 +115,53 @@ def display_grup_1():
 
             col_idx = (col_idx + 1) % 3
 
-    # REVISI 2: Memperbaiki logika penerapan filter
     filtered_df = df.copy()
     for col, selected_values in st.session_state.grup1_filters.items():
-        # Hanya terapkan filter JIKA ada sesuatu yang dipilih.
-        # Jika kosong, artinya "pilih semua" untuk kolom tsb.
         if selected_values:
-            # Pastikan hanya memfilter jika kolomnya ada di dataframe
             if col in filtered_df.columns:
                  filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
     
-    # Bagian selanjutnya tidak ada perubahan, hanya menggunakan filtered_df yang sudah benar
-    if not filtered_df.empty:
-        styled_df = filtered_df.copy()
+    # REVISI FINAL: Menambahkan Opsi Sorting
+    st.markdown("---")
+    st.write("#### Sort Data")
+
+    sortable_columns = list(filtered_df.columns)
+    
+    # Inisialisasi session state untuk sorting jika belum ada
+    if 'sort_col_g1' not in st.session_state:
+        st.session_state.sort_col_g1 = 'date' if 'date' in sortable_columns else sortable_columns[0]
+    if 'sort_order_g1' not in st.session_state:
+        st.session_state.sort_order_g1 = 'Descending'
+
+    sort_col1, sort_col2 = st.columns(2)
+    with sort_col1:
+        # Pastikan nilai default ada di dalam options
+        current_sort_col = st.session_state.sort_col_g1
+        if current_sort_col not in sortable_columns:
+            current_sort_col = sortable_columns[0] if sortable_columns else None
+        
+        if current_sort_col:
+            st.session_state.sort_col_g1 = st.selectbox(
+                "Sort by column",
+                options=sortable_columns,
+                index=sortable_columns.index(current_sort_col)
+            )
+    with sort_col2:
+        st.session_state.sort_order_g1 = st.selectbox(
+            "Order",
+            options=['Descending', 'Ascending'],
+            index=0 if st.session_state.sort_order_g1 == 'Descending' else 1
+        )
+
+    # Terapkan sorting SEBELUM menampilkan dataframe
+    df_to_display = filtered_df
+    if not df_to_display.empty and st.session_state.sort_col_g1 in df_to_display.columns:
+        is_ascending = (st.session_state.sort_order_g1 == 'Ascending')
+        df_to_display = df_to_display.sort_values(by=st.session_state.sort_col_g1, ascending=is_ascending)
+
+    # Tampilkan dataframe yang sudah disortir
+    if not df_to_display.empty:
+        styled_df = df_to_display.copy()
         if 'date' in styled_df.columns:
             styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
         for col in ['selling', 'revenue']:
@@ -143,6 +173,7 @@ def display_grup_1():
         st.info("No data to display for the selected filters.")
         
     st.subheader("📈 Week-on-Week Productivity")
+    # Bagian grafik menggunakan filtered_df (sebelum disortir) agar urutan minggu tetap benar
     if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
         if not filtered_df.empty:
             df_chart_cups = filtered_df.groupby('week')['cups'].sum().reset_index()
@@ -481,6 +512,9 @@ else:
         logout()
     st.sidebar.markdown("---")
     
+    if "view" not in st.session_state:
+        st.session_state.view = "main_menu"
+        
     current_view = st.session_state.get("view", "main_menu")
 
     if current_view == "main_menu":
