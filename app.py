@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 import io
-import gc # Untuk optimalisasi memori
+import gc 
 
 # --- INITIAL SETUP ---
 st.set_page_config(page_title="KSJ Data 2025", layout="wide")
@@ -34,7 +34,7 @@ def logout():
     for key in list(st.session_state.keys()):
         st.session_state.pop(key)
     st.session_state["logged_in"] = False
-    gc.collect() # Perintahkan Python untuk membersihkan memori
+    gc.collect() 
     st.rerun()
 
 def set_view(view_name):
@@ -47,11 +47,10 @@ def set_view(view_name):
 @st.cache_data
 def load_and_process_main_data():
     """Memuat data dari Parquet (prioritas) atau Excel (fallback)."""
+    # REVISI 1: Menghapus semua notifikasi (toast dan warning)
     try:
         df = pd.read_parquet("KSJ_Data_2025.parquet")
-        st.toast("🚀 Data loaded successfully from Parquet file (fast).", icon="✅")
     except FileNotFoundError:
-        st.warning("Parquet file not found. Falling back to Excel. This may be slow.")
         df = pd.read_excel("KSJ Data 2025.xlsx")
 
     df.columns = [col.strip().replace(" ", "").replace("#", "").lower() for col in df.columns]
@@ -99,49 +98,61 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    if 'grup1_filters' not in st.session_state:
-        st.session_state.grup1_filters = {}
+    # REVISI 2: Perbaikan Performa Filter dengan st.form
+    if 'grup1_filter_options' not in st.session_state:
         st.session_state.grup1_filter_options = {}
         for col in df.columns:
             if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200:
-                options = sorted(df[col].dropna().unique())
-                st.session_state.grup1_filter_options[col] = options
-                st.session_state.grup1_filters[col] = options 
-
-    def select_all(filter_key):
-        st.session_state.grup1_filters[filter_key] = st.session_state.grup1_filter_options[filter_key]
-
-    def clear_all(filter_key):
-        st.session_state.grup1_filters[filter_key] = []
+                st.session_state.grup1_filter_options[col] = sorted(df[col].dropna().unique())
+    
+    if 'grup1_selections' not in st.session_state:
+        st.session_state.grup1_selections = {col: options for col, options in st.session_state.grup1_filter_options.items()}
 
     with st.expander("🔎 Filter Data", expanded=True):
-        st.write("Apply filters below. Data will update automatically.")
-        
-        filter_cols = st.columns(3)
-        col_idx = 0
-        for col, options in st.session_state.grup1_filter_options.items():
-            with filter_cols[col_idx]:
-                st.session_state.grup1_filters[col] = st.multiselect(
-                    f"Select {col.title()}",
-                    options=options,
-                    default=st.session_state.grup1_filters.get(col, []),
-                    key=f"multiselect_{col}_g1"
-                )
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.button("Select All", key=f"all_{col}", on_click=select_all, args=[col], use_container_width=True)
-                with c2:
-                    st.button("Clear", key=f"clear_{col}", on_click=clear_all, args=[col], use_container_width=True)
-            col_idx = (col_idx + 1) % 3
+        with st.form(key='filter_form'):
+            filter_cols = st.columns(3)
+            col_idx = 0
+            # Buat widget di dalam form
+            temp_selections = {}
+            for col, options in st.session_state.grup1_filter_options.items():
+                with filter_cols[col_idx]:
+                    temp_selections[col] = st.multiselect(
+                        f"Select {col.title()}",
+                        options=options,
+                        default=st.session_state.grup1_selections.get(col, []),
+                        key=f"multiselect_{col}"
+                    )
+                col_idx = (col_idx + 1) % 3
+            
+            # Tombol utama untuk menerapkan filter
+            c1, c2, c3 = st.columns([2,1,1])
+            with c1:
+                submitted = st.form_submit_button('Apply Filters', use_container_width=True)
+            with c2:
+                if st.form_submit_button('Select All Filters'):
+                    # Jika ditekan, set semua pilihan ke opsi penuh dan update state
+                    for col, options in st.session_state.grup1_filter_options.items():
+                        st.session_state.grup1_selections[col] = options
+                    submitted = True # Anggap form di-submit
+            with c3:
+                if st.form_submit_button('Clear All Filters'):
+                    # Jika ditekan, kosongkan semua pilihan dan update state
+                    for col in st.session_state.grup1_filter_options.keys():
+                        st.session_state.grup1_selections[col] = []
+                    submitted = True # Anggap form di-submit
+            
+            # Jika form di-submit, update state utama dengan pilihan dari dalam form
+            if submitted:
+                st.session_state.grup1_selections = temp_selections
 
-    # Optimalisasi Memori: Tidak menggunakan .copy() di awal
-    filtered_df = df 
-    for col, selected_values in st.session_state.grup1_filters.items():
+    # Filter data hanya menggunakan state yang sudah final
+    filtered_df = df
+    for col, selected_values in st.session_state.grup1_selections.items():
         if selected_values:
             if col in filtered_df.columns:
                  filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
-    
+
+    # Sisa halaman tidak berubah, hanya menggunakan filtered_df yang baru
     if not filtered_df.empty:
         PAGE_SIZE = 1000 
         
@@ -185,6 +196,7 @@ def display_grup_1():
         styled_df.columns = [col.title() for col in styled_df.columns]
         
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
     else:
         st.info("No data to display for the selected filters.")
         
@@ -227,6 +239,10 @@ def display_grup_1():
             st.info("No data available for Productivity by Day based on current filters.")
     else:
         st.warning("Column 'day', 'ridername', or 'cups' is not available.")
+
+# =====================================================================================
+# SISA KODE (KARTU 2 DAN 3) TIDAK DIUBAH SAMA SEKALI
+# =====================================================================================
 
 def display_grup_2():
     if st.button("⬅️ Back to Menu"):
