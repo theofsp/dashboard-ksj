@@ -26,19 +26,15 @@ def logout():
 
 def set_view(view_name):
     st.session_state["view"] = view_name
-    # REVISI: Reset nomor halaman setiap kali pindah view
     st.session_state.page_number = 0 
     st.rerun()
 
 # --- DATA LOADING ---
 @st.cache_data
 def load_and_process_main_data():
-    # Menggunakan parquet jika ada, jika tidak fallback ke excel
-    try:
-        df = pd.read_parquet("KSJ_Data_2025.parquet")
-    except FileNotFoundError:
-        st.warning("If the performance feels slow, please leave this page idle for about 10–15 seconds while the system loads the data :)")
-        df = pd.read_excel("KSJ Data 2025.xlsx")
+    # REVISI: Menghapus logika Parquet, kembali ke Excel sebagai satu-satunya sumber.
+    st.warning("If the performance feels slow, please leave this page idle for about 10–15 seconds while the system loads the data :)")
+    df = pd.read_excel("KSJ Data 2025.xlsx")
 
     df.columns = [col.strip().replace(" ", "").replace("#", "").lower() for col in df.columns]
     if 'date' in df.columns:
@@ -129,9 +125,8 @@ def display_grup_1():
             if col in filtered_df.columns:
                  filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
     
-    # REVISI: Implementasi Paginasi untuk mengaktifkan sorting bawaan
     if not filtered_df.empty:
-        PAGE_SIZE = 1000 # Menampilkan 1000 baris per halaman
+        PAGE_SIZE = 1000 
         
         if 'page_number' not in st.session_state:
             st.session_state.page_number = 0
@@ -139,7 +134,6 @@ def display_grup_1():
         total_rows = len(filtered_df)
         total_pages = (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0)
         
-        # Tombol navigasi halaman
         prev_col, mid_col, next_col = st.columns([1, 2, 1])
 
         with prev_col:
@@ -148,19 +142,19 @@ def display_grup_1():
                 st.rerun()
 
         with mid_col:
-            st.markdown(f"<div style='text-align: center;'>Page {st.session_state.page_number + 1} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
+            # Cegah error jika total_pages = 0
+            display_page_number = st.session_state.page_number + 1 if total_pages > 0 else 0
+            st.markdown(f"<div style='text-align: center;'>Page {display_page_number} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
 
         with next_col:
             if st.button("Next Page ➡️", use_container_width=True, disabled=(st.session_state.page_number >= total_pages - 1)):
                 st.session_state.page_number += 1
                 st.rerun()
 
-        # Potong dataframe sesuai halaman
         start_index = st.session_state.page_number * PAGE_SIZE
         end_index = start_index + PAGE_SIZE
         df_to_display = filtered_df.iloc[start_index:end_index]
         
-        # Proses styling
         styled_df = df_to_display.copy()
         if 'date' in styled_df.columns:
             styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
@@ -169,13 +163,11 @@ def display_grup_1():
                 styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
         styled_df.columns = [col.title() for col in styled_df.columns]
         
-        # Tampilkan tabel yang sudah dipaginasi, fitur sort akan selalu aktif
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
     else:
         st.info("No data to display for the selected filters.")
         
-    # Grafik tetap menggunakan keseluruhan filtered_df, bukan hanya data per halaman
     st.subheader("📈 Week-on-Week Productivity")
     if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
         if not filtered_df.empty:
@@ -216,7 +208,6 @@ def display_grup_1():
     else:
         st.warning("Column 'day', 'ridername', or 'cups' is not available.")
 
-# Sisa kode lainnya tetap sama
 def display_grup_2():
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
@@ -520,6 +511,9 @@ else:
         logout()
     st.sidebar.markdown("---")
     
+    if "view" not in st.session_state:
+        st.session_state.view = "main_menu"
+        
     current_view = st.session_state.get("view", "main_menu")
 
     if current_view == "main_menu":
