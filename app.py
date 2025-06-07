@@ -18,7 +18,8 @@ def to_excel(df: pd.DataFrame):
     return processed_data
 
 def check_login(username, password):
-    if username == "Blitz" and password == "ksj2025":
+    # Memeriksa ke st.secrets, bukan dictionary biasa
+    if username in st.secrets.users and st.secrets.users[username] == password:
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
         st.rerun()
