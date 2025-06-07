@@ -83,14 +83,13 @@ def display_grup_1():
                         selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=[], key=col)
                     
                     # Apply filter if values are selected
-                    if selected_vals: # Make sure selected_vals is not empty
+                    if selected_vals: 
                         filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
-                    else: # If nothing is selected, effectively filter out everything for that column
+                    else: 
                         filtered_df = filtered_df[filtered_df[col].isin([])] 
                 
     if st.button("🔄 Show Data"):
-        # This block was the issue, ensuring it's always executed correctly when button is pressed
-        if not filtered_df.empty: # Add a check if filtered_df is not empty
+        if not filtered_df.empty: 
             styled_df = filtered_df.copy()
             if 'date' in styled_df.columns:
                 styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
@@ -184,24 +183,28 @@ def display_grup_2():
     col1.metric(
         f"Product Sold ({latest_month_period})",
         f"{cups_latest_month:,}",
-        f"{delta_cups_month:,.0f} vs Prv. Month" 
+        delta=delta_cups_month, # Pass raw numeric delta
+        delta_label=f"{delta_cups_month:,.0f} vs Prv. Month" # Custom label
     )
     col2.metric(
         f"Product Sold (Week {latest_week})",
         f"{cups_latest_week:,}",
-        f"{delta_cups_week:,.0f} vs Prv. Week" 
+        delta=delta_cups_week, # Pass raw numeric delta
+        delta_label=f"{delta_cups_week:,.0f} vs Prv. Week" # Custom label
     )
     
     col3, col4 = st.columns(2)
     col3.metric(
         f"Blitz's Revenue ({latest_month_period})",
         f"Rp {revenue_latest_month:,.0f}",
-        f"Rp {delta_revenue_month:,.0f} vs Prv. Month"
+        delta=delta_revenue_month, # Pass raw numeric delta
+        delta_label=f"Rp {delta_revenue_month:,.0f} vs Prv. Month" # Custom label
     )
     col4.metric(
         f"Blitz's Revenue (Week {latest_week})",
         f"Rp {revenue_latest_week:,.0f}",
-        f"Rp {delta_revenue_week:,.0f} vs Prv. Week"
+        delta=delta_revenue_week, # Pass raw numeric delta
+        delta_label=f"Rp {delta_revenue_week:,.0f} vs Prv. Week" # Custom label
     )
     
     st.markdown("---")
