@@ -393,28 +393,89 @@ def display_area_analysis():
     st.markdown("---")
     
     st.subheader("Performance Breakdown")
-    chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet'}
-    if selected_outlet != 'All Outlets':
-        st.info(f"Showing performance for outlet: **{selected_outlet}**")
-        outlet_trend = df_filtered.groupby('week')['revenue'].sum().reset_index()
-        fig = px.line(outlet_trend, x='week', y='revenue', title=f"Weekly Revenue Trend for {selected_outlet}", markers=True, labels=chart_labels)
-        st.plotly_chart(fig, use_container_width=True)
-    elif selected_district != 'All Districts':
-        breakdown_data = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-        fig = px.bar(breakdown_data, x='outlet', y='revenue', title=f"Revenue Breakdown by Outlet in {selected_district}", labels=chart_labels)
-        st.plotly_chart(fig, use_container_width=True)
-    elif selected_city != 'All Cities':
-        breakdown_data = df_filtered.groupby('district')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-        fig = px.bar(breakdown_data, x='district', y='revenue', title=f"Revenue Breakdown by District in {selected_city}", labels=chart_labels)
-        st.plotly_chart(fig, use_container_width=True)
-    elif selected_area != 'All Areas':
-        breakdown_data = df_filtered.groupby('city')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-        fig = px.bar(breakdown_data, x='city', y='revenue', title=f"Revenue Breakdown by City in {selected_area}", labels=chart_labels)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        breakdown_data = df_filtered.groupby('area')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-        fig = px.bar(breakdown_data, x='area', y='revenue', title="Overall Revenue Breakdown by Area", labels=chart_labels)
-        st.plotly_chart(fig, use_container_width=True)
+    chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet', 'cups': 'Cups Sold'} # Added 'cups' label
+    
+    # Layout for two charts side-by-side
+    col_revenue_chart, col_cups_chart = st.columns(2)
+
+    with col_revenue_chart:
+        if selected_outlet != 'All Outlets':
+            # Check if there is data before trying to group and plot
+            if not df_filtered.empty and 'week' in df_filtered.columns and 'revenue' in df_filtered.columns:
+                outlet_trend_revenue = df_filtered.groupby('week')['revenue'].sum().reset_index()
+                st.info(f"Showing Revenue Trend for outlet: **{selected_outlet}**")
+                fig_revenue = px.line(outlet_trend_revenue, x='week', y='revenue', title=f"Weekly Revenue Trend for {selected_outlet}", markers=True, labels=chart_labels)
+                st.plotly_chart(fig_revenue, use_container_width=True)
+            else:
+                st.info("No revenue data available for this outlet with current filters.")
+        elif selected_district != 'All Districts':
+            if not df_filtered.empty and 'outlet' in df_filtered.columns and 'revenue' in df_filtered.columns:
+                breakdown_data_revenue = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+                fig_revenue = px.bar(breakdown_data_revenue, x='outlet', y='revenue', title=f"Revenue Breakdown by Outlet in {selected_district}", labels=chart_labels)
+                st.plotly_chart(fig_revenue, use_container_width=True)
+            else:
+                st.info("No revenue data available for this district with current filters.")
+        elif selected_city != 'All Cities':
+            if not df_filtered.empty and 'district' in df_filtered.columns and 'revenue' in df_filtered.columns:
+                breakdown_data_revenue = df_filtered.groupby('district')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+                fig_revenue = px.bar(breakdown_data_revenue, x='district', y='revenue', title=f"Revenue Breakdown by District in {selected_city}", labels=chart_labels)
+                st.plotly_chart(fig_revenue, use_container_width=True)
+            else:
+                st.info("No revenue data available for this city with current filters.")
+        elif selected_area != 'All Areas':
+            if not df_filtered.empty and 'city' in df_filtered.columns and 'revenue' in df_filtered.columns:
+                breakdown_data_revenue = df_filtered.groupby('city')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+                fig_revenue = px.bar(breakdown_data_revenue, x='city', y='revenue', title=f"Revenue Breakdown by City in {selected_area}", labels=chart_labels)
+                st.plotly_chart(fig_revenue, use_container_width=True)
+            else:
+                st.info("No revenue data available for this area with current filters.")
+        else: # All Areas
+            if not df_filtered.empty and 'area' in df_filtered.columns and 'revenue' in df_filtered.columns:
+                breakdown_data_revenue = df_filtered.groupby('area')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+                fig_revenue = px.bar(breakdown_data_revenue, x='area', y='revenue', title="Overall Revenue Breakdown by Area", labels=chart_labels)
+                st.plotly_chart(fig_revenue, use_container_width=True)
+            else:
+                st.info("No overall revenue data available with current filters.")
+            
+    with col_cups_chart:
+        if selected_outlet != 'All Outlets':
+            # Check if there is data before trying to group and plot
+            if not df_filtered.empty and 'week' in df_filtered.columns and 'cups' in df_filtered.columns:
+                outlet_trend_cups = df_filtered.groupby('week')['cups'].sum().reset_index()
+                st.info(f"Showing Cups Sold Trend for outlet: **{selected_outlet}**")
+                fig_cups = px.line(outlet_trend_cups, x='week', y='cups', title=f"Weekly Cups Sold Trend for {selected_outlet}", markers=True, labels=chart_labels)
+                st.plotly_chart(fig_cups, use_container_width=True)
+            else:
+                st.info("No cups sold data available for this outlet with current filters.")
+        elif selected_district != 'All Districts':
+            if not df_filtered.empty and 'outlet' in df_filtered.columns and 'cups' in df_filtered.columns:
+                breakdown_data_cups = df_filtered.groupby('outlet')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+                fig_cups = px.bar(breakdown_data_cups, x='outlet', y='cups', title=f"Cups Sold Breakdown by Outlet in {selected_district}", labels=chart_labels)
+                st.plotly_chart(fig_cups, use_container_width=True)
+            else:
+                st.info("No cups sold data available for this district with current filters.")
+        elif selected_city != 'All Cities':
+            if not df_filtered.empty and 'district' in df_filtered.columns and 'cups' in df_filtered.columns:
+                breakdown_data_cups = df_filtered.groupby('district')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+                fig_cups = px.bar(breakdown_data_cups, x='district', y='cups', title=f"Cups Sold Breakdown by District in {selected_city}", labels=chart_labels)
+                st.plotly_chart(fig_cups, use_container_width=True)
+            else:
+                st.info("No cups sold data available for this city with current filters.")
+        elif selected_area != 'All Areas':
+            if not df_filtered.empty and 'city' in df_filtered.columns and 'cups' in df_filtered.columns:
+                breakdown_data_cups = df_filtered.groupby('city')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+                fig_cups = px.bar(breakdown_data_cups, x='city', y='cups', title=f"Cups Sold Breakdown by City in {selected_area}", labels=chart_labels)
+                st.plotly_chart(fig_cups, use_container_width=True)
+            else:
+                st.info("No cups sold data available for this area with current filters.")
+        else: # All Areas
+            if not df_filtered.empty and 'area' in df_filtered.columns and 'cups' in df_filtered.columns:
+                breakdown_data_cups = df_filtered.groupby('area')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+                fig_cups = px.bar(breakdown_data_cups, x='area', y='cups', title="Overall Cups Sold Breakdown by Area", labels=chart_labels)
+                st.plotly_chart(fig_cups, use_container_width=True)
+            else:
+                st.info("No overall cups sold data available with current filters.")
+
 
     st.markdown("---")
     st.subheader("District Productivity Ranking")
