@@ -10,7 +10,7 @@ import gc
 st.set_page_config(
     page_title="KSJ Data 2025", 
     layout="wide",
-    page_icon="BLITZ LOGO.png")
+    page_icon="rideblitz_logo.jpeg")
 
 # --- UTILITY FUNCTIONS ---
 def to_excel(df: pd.DataFrame):
