@@ -64,6 +64,7 @@ def display_main_menu():
             st.button("Open Report", on_click=set_view, args=['area_analysis'], key="area_button", use_container_width=True)
 
 def display_grup_1():
+    # KODE DI BAGIAN INI DIKEMBALIKAN KE VERSI ASLI ANDA
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
     st.markdown("---")
@@ -81,26 +82,16 @@ def display_grup_1():
                         selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=default_vals, key=col)
                     else:
                         selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=[], key=col)
-                    
-                    # Apply filter if values are selected
-                    if selected_vals: 
-                        filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
-                    else: 
-                        filtered_df = filtered_df[filtered_df[col].isin([])] 
-                
+                    filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
     if st.button("🔄 Show Data"):
-        if not filtered_df.empty: 
-            styled_df = filtered_df.copy()
-            if 'date' in styled_df.columns:
-                styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
-            for col in ['selling', 'revenue']:
-                if col in styled_df.columns:
-                    styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
-            styled_df.columns = [col.title() for col in styled_df.columns]
-            st.dataframe(styled_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No data to display after applying filters.")
-
+        styled_df = filtered_df.copy()
+        if 'date' in styled_df.columns:
+             styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
+        for col in ['selling', 'revenue']:
+            if col in styled_df.columns:
+                styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
+        styled_df.columns = [col.title() for col in styled_df.columns]
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
     st.subheader("📈 Week-on-Week Productivity")
     if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
         col1, col2 = st.columns(2)
@@ -180,31 +171,38 @@ def display_grup_2():
     delta_revenue_week = revenue_latest_week - revenue_previous_week
 
     col1, col2 = st.columns(2)
+    # Product Sold (Month) - Delta will be formatted by Streamlit automatically
     col1.metric(
         f"Product Sold ({latest_month_period})",
         f"{cups_latest_month:,}",
-        delta=delta_cups_month, # Pass raw numeric delta
-        delta_label=f"{delta_cups_month:,.0f} vs Prv. Month" # Custom label
+        delta=delta_cups_month, # Pass numeric delta value
+        help=f"Change vs. Previous Month" # Add a tooltip for clarity
     )
+    # Product Sold (Week) - Delta will be formatted by Streamlit automatically
     col2.metric(
         f"Product Sold (Week {latest_week})",
         f"{cups_latest_week:,}",
-        delta=delta_cups_week, # Pass raw numeric delta
-        delta_label=f"{delta_cups_week:,.0f} vs Prv. Week" # Custom label
+        delta=delta_cups_week, # Pass numeric delta value
+        help=f"Change vs. Previous Week" # Add a tooltip for clarity
     )
     
     col3, col4 = st.columns(2)
+    # Blitz's Revenue (Month) - Delta will be formatted by Streamlit automatically, including 'Rp'
+    # For numeric delta to be colored correctly, format its display directly in delta parameter
     col3.metric(
         f"Blitz's Revenue ({latest_month_period})",
         f"Rp {revenue_latest_month:,.0f}",
-        delta=delta_revenue_month, # Pass raw numeric delta
-        delta_label=f"Rp {delta_revenue_month:,.0f} vs Prv. Month" # Custom label
+        delta=delta_revenue_month, # Pass numeric delta value
+        delta_color="normal", # Explicitly set to 'normal' (green for positive, red for negative)
+        help=f"Change vs. Previous Month" # Add a tooltip for clarity
     )
+    # Blitz's Revenue (Week) - Delta will be formatted by Streamlit automatically, including 'Rp'
     col4.metric(
         f"Blitz's Revenue (Week {latest_week})",
         f"Rp {revenue_latest_week:,.0f}",
-        delta=delta_revenue_week, # Pass raw numeric delta
-        delta_label=f"Rp {delta_revenue_week:,.0f} vs Prv. Week" # Custom label
+        delta=delta_revenue_week, # Pass numeric delta value
+        delta_color="normal", # Explicitly set to 'normal'
+        help=f"Change vs. Previous Week" # Add a tooltip for clarity
     )
     
     st.markdown("---")
