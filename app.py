@@ -64,7 +64,7 @@ def display_main_menu():
             st.button("Open Report", on_click=set_view, args=['area_analysis'], key="area_button", use_container_width=True)
 
 def display_grup_1():
-    # KODE DI BAGIAN INI DIKEMBALIKAN KE VERSI ASLI ANDA
+    # KODE DI BAGIAN INI DIKEMBALIKAN KE VERSI ASLI ANDA SEBELUMNYA
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
     st.markdown("---")
@@ -148,21 +148,29 @@ def display_grup_2():
     st.markdown("---")
 
     st.subheader("Business Position")
+    # Pastikan 'date' dan 'week' ada sebelum mencoba mengaksesnya
+    if 'date' not in df.columns or 'week' not in df.columns:
+        st.warning("Kolom 'date' atau 'week' tidak ditemukan untuk analisis posisi bisnis.")
+        return # Keluar dari fungsi jika kolom esensial tidak ada
+
     latest_month_period = df['date'].dt.to_period('M').max()
     previous_month_period = latest_month_period - 1
-    cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum()
-    cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum()
     
-    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum()
-    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum()
+    # Safely get values, defaulting to 0 if no data for period
+    cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum() if not df[df['date'].dt.to_period('M') == latest_month_period].empty else 0
+    cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum() if not df[df['date'].dt.to_period('M') == previous_month_period].empty else 0
+    
+    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum() if not df[df['date'].dt.to_period('M') == latest_month_period].empty else 0
+    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum() if not df[df['date'].dt.to_period('M') == previous_month_period].empty else 0
 
     latest_week = df['week'].max()
     previous_week = latest_week - 1
-    cups_latest_week = df[df['week'] == latest_week]['cups'].sum()
-    cups_previous_week = df[df['week'] == previous_week]['cups'].sum()
+    
+    cups_latest_week = df[df['week'] == latest_week]['cups'].sum() if not df[df['week'] == latest_week].empty else 0
+    cups_previous_week = df[df['week'] == previous_week]['cups'].sum() if not df[df['week'] == previous_week].empty else 0
 
-    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum()
-    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum()
+    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum() if not df[df['week'] == latest_week].empty else 0
+    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum() if not df[df['week'] == previous_week].empty else 0
 
     # Calculate differences for delta
     delta_cups_month = cups_latest_month - cups_previous_month
@@ -171,38 +179,33 @@ def display_grup_2():
     delta_revenue_week = revenue_latest_week - revenue_previous_week
 
     col1, col2 = st.columns(2)
-    # Product Sold (Month) - Delta will be formatted by Streamlit automatically
+    # Product Sold (Month)
     col1.metric(
-        f"Product Sold ({latest_month_period})",
-        f"{cups_latest_month:,}",
-        delta=delta_cups_month, # Pass numeric delta value
-        help=f"Change vs. Previous Month" # Add a tooltip for clarity
+        label=f"Product Sold ({latest_month_period})",
+        value=f"{cups_latest_month:,}",
+        delta=delta_cups_month # Pass numeric delta value
     )
-    # Product Sold (Week) - Delta will be formatted by Streamlit automatically
+    # Product Sold (Week)
     col2.metric(
-        f"Product Sold (Week {latest_week})",
-        f"{cups_latest_week:,}",
-        delta=delta_cups_week, # Pass numeric delta value
-        help=f"Change vs. Previous Week" # Add a tooltip for clarity
+        label=f"Product Sold (Week {latest_week})",
+        value=f"{cups_latest_week:,}",
+        delta=delta_cups_week # Pass numeric delta value
     )
     
     col3, col4 = st.columns(2)
-    # Blitz's Revenue (Month) - Delta will be formatted by Streamlit automatically, including 'Rp'
-    # For numeric delta to be colored correctly, format its display directly in delta parameter
+    # Blitz's Revenue (Month)
     col3.metric(
-        f"Blitz's Revenue ({latest_month_period})",
-        f"Rp {revenue_latest_month:,.0f}",
-        delta=delta_revenue_month, # Pass numeric delta value
-        delta_color="normal", # Explicitly set to 'normal' (green for positive, red for negative)
-        help=f"Change vs. Previous Month" # Add a tooltip for clarity
+        label=f"Blitz's Revenue ({latest_month_period})",
+        value=f"Rp {revenue_latest_month:,.0f}",
+        delta=f"Rp {delta_revenue_month:,.0f} vs Prv. Month", # Streamlit will attempt to parse this, for explicit color
+        delta_color="normal" # "normal" means green for positive, red for negative
     )
-    # Blitz's Revenue (Week) - Delta will be formatted by Streamlit automatically, including 'Rp'
+    # Blitz's Revenue (Week)
     col4.metric(
-        f"Blitz's Revenue (Week {latest_week})",
-        f"Rp {revenue_latest_week:,.0f}",
-        delta=delta_revenue_week, # Pass numeric delta value
-        delta_color="normal", # Explicitly set to 'normal'
-        help=f"Change vs. Previous Week" # Add a tooltip for clarity
+        label=f"Blitz's Revenue (Week {latest_week})",
+        value=f"Rp {revenue_latest_week:,.0f}",
+        delta=f"Rp {delta_revenue_week:,.0f} vs Prv. Week", # For explicit color
+        delta_color="normal" # "normal" means green for positive, red for negative
     )
     
     st.markdown("---")
