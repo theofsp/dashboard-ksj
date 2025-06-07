@@ -73,18 +73,18 @@ def display_grup_1():
     st.subheader("📄 All Data")
     
     # Inisialisasi session state untuk filter jika belum ada
-    if 'grup1_filters' not in st.session_state:
-        st.session_state['grup1_filters'] = {}
+    if 'grup1_filters_state' not in st.session_state:
+        st.session_state['grup1_filters_state'] = {}
         # Populate initial filter states based on unique values
         for col in df.columns:
             if df[col].dtype != 'datetime64[ns]':
                 unique_vals = df[col].dropna().unique()
                 if len(unique_vals) < 100:
-                    st.session_state['grup1_filters'][col] = sorted(unique_vals) # Default to all selected
-
-    # Inisialisasi session state untuk tampilan dataframe jika belum ada
-    if 'grup1_show_data' not in st.session_state:
-        st.session_state['grup1_show_data'] = False # Default: Data tidak ditampilkan
+                    st.session_state['grup1_filters_state'][col] = sorted(unique_vals) # Default to all selected
+    
+    # Inisialisasi filtered_df untuk digunakan oleh grafik & tabel
+    if 'grup1_filtered_df' not in st.session_state:
+        st.session_state['grup1_filtered_df'] = df.copy() # Default: Tampilkan semua data awal
 
     with st.expander("🔎 Filter"):
         for col in df.columns:
@@ -92,83 +92,96 @@ def display_grup_1():
                 unique_vals = df[col].dropna().unique()
                 if len(unique_vals) < 100:
                     default_vals = sorted(unique_vals)
-                    select_all_key = f"all_filter_{col}"
+                    select_all_key = f"all_filter_{col}_g1" # Unique key
                     
                     # Set default value for checkbox based on current multiselect state
-                    is_all_selected = (len(st.session_state['grup1_filters'].get(col, [])) == len(default_vals))
+                    is_all_selected = (len(st.session_state['grup1_filters_state'].get(col, [])) == len(default_vals))
 
                     select_all = st.checkbox(f"Select All {col.title()}", value=is_all_selected, key=select_all_key)
                     
-                    # Update selected_vals based on checkbox
+                    # Update selected_vals based on checkbox or manual selection
                     if select_all:
-                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=default_vals, key=f"multiselect_{col}")
+                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=default_vals, key=f"multiselect_{col}_g1")
                     else:
-                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=st.session_state['grup1_filters'].get(col, []), key=f"multiselect_{col}")
+                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=st.session_state['grup1_filters_state'].get(col, []), key=f"multiselect_{col}_g1")
                     
                     # Update session state with current selections
-                    st.session_state['grup1_filters'][col] = current_selected_vals
+                    st.session_state['grup1_filters_state'][col] = current_selected_vals
     
-    # Handle the "Show Data" button click
+    # Logic to apply filters and update session state when "Show Data" button is clicked
     if st.button("🔄 Show Data"):
-        st.session_state['grup1_show_data'] = True # Set flag to true to display data
-    
-    # Display data if the flag is true
-    if st.session_state['grup1_show_data']:
         temp_df = df.copy() # Start with full dataframe
         # Apply filters from session state
-        for col, vals in st.session_state['grup1_filters'].items():
+        for col, vals in st.session_state['grup1_filters_state'].items():
             if vals: # Only filter if there are values selected for this column
                 temp_df = temp_df[temp_df[col].isin(vals)]
-            else: # If no values selected for a column, result should be empty for that filter
-                temp_df = pd.DataFrame(columns=temp_df.columns) # Effectively empty the DataFrame
+            else: # If no values selected for a column, effectively empty the DataFrame
+                temp_df = pd.DataFrame(columns=temp_df.columns) 
                 break # No need to check other filters, result is already empty
         
-        if not temp_df.empty:
-            styled_df = temp_df.copy()
-            if 'date' in styled_df.columns:
-                styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
-            for col in ['selling', 'revenue']:
-                if col in styled_df.columns:
-                    styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
-            styled_df.columns = [col.title() for col in styled_df.columns]
-            st.dataframe(styled_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No data to display after applying filters.")
+        st.session_state['grup1_filtered_df'] = temp_df # Simpan hasil filter ke session state
+    
+    # Gunakan st.session_state['grup1_filtered_df'] untuk menampilkan data dan grafik
+    current_filtered_df = st.session_state['grup1_filtered_df']
+
+    # Tampilkan dataframe
+    if not current_filtered_df.empty:
+        styled_df = current_filtered_df.copy()
+        if 'date' in styled_df.columns:
+            styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
+        for col in ['selling', 'revenue']:
+            if col in styled_df.columns:
+                styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
+        styled_df.columns = [col.title() for col in styled_df.columns]
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No data to display for the selected filters.")
             
     st.subheader("📈 Week-on-Week Productivity")
-    # Bagian grafik ini tidak menggunakan filtered_df_for_display dari tombol Show Data.
-    # Mereka menggunakan df (data penuh) karena memang tidak ada state management untuk filter di grafik ini.
-    # Sesuai permintaan Anda, saya tidak mengubah bagian ini.
-    if 'week' in df.columns and 'cups' in df.columns and 'revenue' in df.columns:
-        col1, col2 = st.columns(2)
-        with col1:
-            df_chart_cups = df.groupby('week')['cups'].sum().reset_index()
-            fig_cups = px.bar(df_chart_cups, x='week', y='cups', title='Total Cups per Week', labels={'cups': 'Cups Sold', 'week': 'Week'}, text_auto=True)
-            st.plotly_chart(fig_cups, use_container_width=True)
-        with col2:
-            df_chart_revenue = df.groupby('week')['revenue'].sum().reset_index()
-            fig_revenue = px.bar(df_chart_revenue, x='week', y='revenue', title='Total Revenue per Week', labels={'revenue': 'Total Revenue (Rp)', 'week': 'Week'}, text_auto=True)
-            fig_revenue.update_traces(texttemplate='Rp%{y:,.0f}', textposition='outside')
-            fig_revenue.update_yaxes(title_text='Total Revenue (Rp)')
-            st.plotly_chart(fig_revenue, use_container_width=True)
+    # Bagian grafik ini sekarang menggunakan current_filtered_df
+    if 'week' in current_filtered_df.columns and 'cups' in current_filtered_df.columns and 'revenue' in current_filtered_df.columns:
+        if not current_filtered_df.empty:
+            df_chart_cups = current_filtered_df.groupby('week')['cups'].sum().reset_index()
+            df_chart_revenue = current_filtered_df.groupby('week')['revenue'].sum().reset_index()
+
+            col1, col2 = st.columns(2)
+            with col1:
+                fig_cups = px.bar(df_chart_cups, x='week', y='cups', title='Total Cups per Week', labels={'cups': 'Cups Sold', 'week': 'Week'}, text_auto=True)
+                st.plotly_chart(fig_cups, use_container_width=True)
+            with col2:
+                fig_revenue = px.bar(df_chart_revenue, x='week', y='revenue', title='Total Revenue per Week', labels={'revenue': 'Total Revenue (Rp)', 'week': 'Week'}, text_auto=True)
+                fig_revenue.update_traces(texttemplate='Rp%{y:,.0f}', textposition='outside')
+                fig_revenue.update_yaxes(title_text='Total Revenue (Rp)')
+                st.plotly_chart(fig_revenue, use_container_width=True)
+        else:
+            st.info("No data available for Week-on-Week Productivity based on current filters.")
     else:
         st.warning("Column 'week', 'cups', or 'revenue' is not available for charting.")
         
     st.subheader("📅 Productivity by Day")
-    if 'day' in df.columns and 'cups' in df.columns and 'ridername' in df.columns:
-        df_day = df.copy()
-        daily_stats = df_day.groupby(['day', 'date']).agg(total_cups=('cups', 'sum'), unique_riders=('ridername', 'nunique')).reset_index()
-        avg_sellers_day = daily_stats.groupby('day')['unique_riders'].mean().round(0).astype(int).reset_index(name='avg_sellers')
-        total_cups_day = daily_stats.groupby('day')['total_cups'].sum().reset_index(name='total_cups')
-        daily_stats['productivity'] = daily_stats.apply(lambda row: row['total_cups'] / row['unique_riders'] if row['unique_riders'] > 0 else 0, axis=1)
-        avg_productivity_day = daily_stats.groupby('day')['productivity'].mean().round(0).astype(int).reset_index(name='avg_productivity')
-        summary = total_cups_day.merge(avg_sellers_day, on='day').merge(avg_productivity_day, on='day')
-        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        summary['day'] = pd.Categorical(summary['day'], categories=day_order, ordered=True)
-        summary = summary.sort_values('day')
-        st.dataframe(summary.rename(columns={'day': 'Day','total_cups': 'Total Cups','avg_sellers': 'Avg. Sellers','avg_productivity': 'Avg. Cups Sold Per Day'}), use_container_width=True, hide_index=True)
-        pie_fig = px.pie(summary, names='day', values='total_cups', title='Cups Sold by Day', category_orders={'day': day_order})
-        st.plotly_chart(pie_fig, use_container_width=True)
+    # Bagian grafik ini juga sekarang menggunakan current_filtered_df
+    if 'day' in current_filtered_df.columns and 'cups' in current_filtered_df.columns and 'ridername' in current_filtered_df.columns:
+        if not current_filtered_df.empty:
+            df_day = current_filtered_df.copy()
+            daily_stats = df_day.groupby(['day', 'date']).agg(total_cups=('cups', 'sum'), unique_riders=('ridername', 'nunique')).reset_index()
+            
+            avg_sellers_day = daily_stats.groupby('day')['unique_riders'].mean().round(0).astype(int).reset_index(name='avg_sellers')
+            total_cups_day = daily_stats.groupby('day')['total_cups'].sum().reset_index(name='total_cups')
+            
+            # Handle division by zero for productivity if unique_riders is 0
+            daily_stats['productivity'] = daily_stats.apply(lambda row: row['total_cups'] / row['unique_riders'] if row['unique_riders'] > 0 else 0, axis=1)
+            avg_productivity_day = daily_stats.groupby('day')['productivity'].mean().round(0).astype(int).reset_index(name='avg_productivity')
+            
+            summary = total_cups_day.merge(avg_sellers_day, on='day').merge(avg_productivity_day, on='day')
+            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            summary['day'] = pd.Categorical(summary['day'], categories=day_order, ordered=True)
+            summary = summary.sort_values('day')
+            
+            st.dataframe(summary.rename(columns={'day': 'Day','total_cups': 'Total Cups','avg_sellers': 'Avg. Sellers','avg_productivity': 'Avg. Cups Sold Per Day'}), use_container_width=True, hide_index=True)
+            pie_fig = px.pie(summary, names='day', values='total_cups', title='Cups Sold by Day', category_orders={'day': day_order})
+            st.plotly_chart(pie_fig, use_container_width=True)
+        else:
+            st.info("No data available for Productivity by Day based on current filters.")
     else:
         st.warning("Column 'day', 'ridername', or 'cups' is not available.")
 
