@@ -26,12 +26,20 @@ def logout():
 
 def set_view(view_name):
     st.session_state["view"] = view_name
+    # REVISI: Reset nomor halaman setiap kali pindah view
+    st.session_state.page_number = 0 
     st.rerun()
 
 # --- DATA LOADING ---
 @st.cache_data
 def load_and_process_main_data():
-    df = pd.read_excel("KSJ Data 2025.xlsx")
+    # Menggunakan parquet jika ada, jika tidak fallback ke excel
+    try:
+        df = pd.read_parquet("KSJ_Data_2025.parquet")
+    except FileNotFoundError:
+        st.warning("File Parquet tidak ditemukan, fallback ke Excel. Performa mungkin lebih lambat. Pertimbangkan untuk menjalankan skrip konversi.")
+        df = pd.read_excel("KSJ Data 2025.xlsx")
+
     df.columns = [col.strip().replace(" ", "").replace("#", "").lower() for col in df.columns]
     if 'date' in df.columns:
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
@@ -77,18 +85,15 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    # REVISI 2: Logika filter dirombak total untuk memperbaiki semua masalah
     if 'grup1_filters' not in st.session_state:
         st.session_state.grup1_filters = {}
-        # Inisialisasi daftar OPSI filter
         st.session_state.grup1_filter_options = {}
         for col in df.columns:
-            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200: # Naikkan limit sedikit jika perlu
+            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200:
                 options = sorted(df[col].dropna().unique())
                 st.session_state.grup1_filter_options[col] = options
-                st.session_state.grup1_filters[col] = options # Defaultnya pilih semua
+                st.session_state.grup1_filters[col] = options 
 
-    # Fungsi helper untuk tombol Select All / Clear
     def select_all(filter_key):
         st.session_state.grup1_filters[filter_key] = st.session_state.grup1_filter_options[filter_key]
 
@@ -110,7 +115,6 @@ def display_grup_1():
                     key=f"multiselect_{col}_g1"
                 )
                 
-                # REVISI 2: Mengembalikan tombol Select All / Clear dengan metode stabil
                 c1, c2 = st.columns(2)
                 with c1:
                     st.button("Select All", key=f"all_{col}", on_click=select_all, args=[col], use_container_width=True)
@@ -119,29 +123,59 @@ def display_grup_1():
 
             col_idx = (col_idx + 1) % 3
 
-    # REVISI 2: Memperbaiki logika penerapan filter
     filtered_df = df.copy()
     for col, selected_values in st.session_state.grup1_filters.items():
-        # Hanya terapkan filter JIKA ada sesuatu yang dipilih.
-        # Jika kosong, artinya "pilih semua" untuk kolom tsb.
         if selected_values:
-            # Pastikan hanya memfilter jika kolomnya ada di dataframe
             if col in filtered_df.columns:
                  filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
     
-    # Bagian selanjutnya tidak ada perubahan, hanya menggunakan filtered_df yang sudah benar
+    # REVISI: Implementasi Paginasi untuk mengaktifkan sorting bawaan
     if not filtered_df.empty:
-        styled_df = filtered_df.copy()
+        PAGE_SIZE = 1000 # Menampilkan 1000 baris per halaman
+        
+        if 'page_number' not in st.session_state:
+            st.session_state.page_number = 0
+            
+        total_rows = len(filtered_df)
+        total_pages = (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0)
+        
+        # Tombol navigasi halaman
+        prev_col, mid_col, next_col = st.columns([1, 2, 1])
+
+        with prev_col:
+            if st.button("⬅️ Previous Page", use_container_width=True, disabled=(st.session_state.page_number == 0)):
+                st.session_state.page_number -= 1
+                st.rerun()
+
+        with mid_col:
+            st.markdown(f"<div style='text-align: center;'>Page {st.session_state.page_number + 1} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
+
+        with next_col:
+            if st.button("Next Page ➡️", use_container_width=True, disabled=(st.session_state.page_number >= total_pages - 1)):
+                st.session_state.page_number += 1
+                st.rerun()
+
+        # Potong dataframe sesuai halaman
+        start_index = st.session_state.page_number * PAGE_SIZE
+        end_index = start_index + PAGE_SIZE
+        df_to_display = filtered_df.iloc[start_index:end_index]
+        
+        # Proses styling
+        styled_df = df_to_display.copy()
         if 'date' in styled_df.columns:
             styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
         for col in ['selling', 'revenue']:
             if col in styled_df.columns:
                 styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
         styled_df.columns = [col.title() for col in styled_df.columns]
+        
+        # Tampilkan tabel yang sudah dipaginasi, fitur sort akan selalu aktif
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
     else:
         st.info("No data to display for the selected filters.")
         
+    # Grafik tetap menggunakan keseluruhan filtered_df, bukan hanya data per halaman
     st.subheader("📈 Week-on-Week Productivity")
     if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
         if not filtered_df.empty:
@@ -182,6 +216,7 @@ def display_grup_1():
     else:
         st.warning("Column 'day', 'ridername', or 'cups' is not available.")
 
+# Sisa kode lainnya tetap sama
 def display_grup_2():
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
@@ -466,6 +501,10 @@ else:
     if "main_df" not in st.session_state:
         with st.spinner("Processing Your Data. Please wait... :)"):
             st.session_state["main_df"] = load_and_process_main_data()
+            
+    # Inisialisasi state paginasi di awal setelah login
+    if 'page_number' not in st.session_state:
+        st.session_state.page_number = 0
             
     col1, col2 = st.columns([1, 8])
     with col1:
