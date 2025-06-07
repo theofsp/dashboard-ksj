@@ -13,13 +13,14 @@ def check_login(username, password):
         st.session_state["username"] = username
     else:
         st.session_state["logged_in"] = False
+        st.session_state.pop("username", None) # Ensure username is cleared on failed login
         st.error("Incorrect Username or Password!")
 
 def logout():
     st.session_state["logged_in"] = False
     st.session_state.pop("username", None)
     st.session_state.pop("view", None)
-    st.session_state.pop("main_df", None)
+    st.session_state.pop("main_df", None) # Clear data on logout
 
 def set_view(view_name):
     st.session_state["view"] = view_name
@@ -125,7 +126,6 @@ def display_grup_1():
         st.warning("Column 'day', 'ridername', or 'cups' is not available.")
 
 def display_grup_2():
-    # KODE DI BAGIAN INI TIDAK DIUBAH SAMA SEKALI
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
     st.markdown("---")
@@ -136,25 +136,43 @@ def display_grup_2():
     display_summary_df = summary_df.rename(columns={'week': 'Week', 'ksj_revenue': "KSJ's Revenue", 'blitz_revenue': "Blitz's Revenue",'active_sellers': 'Active Sellers', 'total_cups': 'Total Cups'})
     st.dataframe(display_summary_df.style.format({"KSJ's Revenue": "Rp {:,.0f}","Blitz's Revenue": "Rp {:,.0f}"}),use_container_width=True, hide_index=True)
     st.markdown("---")
+
     st.subheader("Business Summary")
     total_ksj_revenue = df['selling'].sum()
     total_blitz_revenue = df['revenue'].sum()
-    col1, col2 = st.columns(2)
+    total_cups_sold = df['cups'].sum() # Menambahkan Total Product Sold
+    col1, col2, col3 = st.columns(3) # Mengubah menjadi 3 kolom
     col1.metric("Total Client's Revenue (KSJ)", f"Rp {total_ksj_revenue:,.0f}")
     col2.metric("Total Blitz's Revenue", f"Rp {total_blitz_revenue:,.0f}")
+    col3.metric("Total Product Sold", f"{total_cups_sold:,}") # Menampilkan Total Product Sold
     st.markdown("---")
+
     st.subheader("Business Position")
     latest_month_period = df['date'].dt.to_period('M').max()
     previous_month_period = latest_month_period - 1
     cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum()
     cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum()
+
+    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum() # Menambahkan Total Blitz's Revenue
+    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum() # Menambahkan Total Blitz's Revenue
+
     latest_week = df['week'].max()
     previous_week = latest_week - 1
     cups_latest_week = df[df['week'] == latest_week]['cups'].sum()
     cups_previous_week = df[df['week'] == previous_week]['cups'].sum()
+
+    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum() # Menambahkan Total Blitz's Revenue
+    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum() # Menambahkan Total Blitz's Revenue
+
     col1, col2 = st.columns(2)
     col1.metric(f"Product Sold ({latest_month_period})", f"{cups_latest_month:,}", f"{cups_latest_month - cups_previous_month:,} vs Prv. Month")
     col2.metric(f"Product Sold (Week {latest_week})", f"{cups_latest_week:,}", f"{cups_latest_week - cups_previous_week:,} vs Prv. Week")
+    
+    # Menambahkan baris untuk Total Blitz's Revenue
+    col3, col4 = st.columns(2)
+    col3.metric(f"Blitz's Revenue ({latest_month_period})", f"Rp {revenue_latest_month:,.0f}", f"Rp {revenue_latest_month - revenue_previous_month:,.0f} vs Prv. Month")
+    col4.metric(f"Blitz's Revenue (Week {latest_week})", f"Rp {revenue_latest_week:,.0f}", f"Rp {revenue_latest_week - revenue_previous_week:,.0f} vs Prv. Week")
+    
     st.markdown("---")
     st.subheader("Seller Retention Analysis")
     @st.cache_data
