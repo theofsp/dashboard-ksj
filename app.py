@@ -7,7 +7,10 @@ import io
 import gc 
 
 # --- INITIAL SETUP & FUNCTIONS ---
-st.set_page_config(page_title="KSJ Data 2025", layout="wide")
+st.set_page_config(
+    page_title="KSJ Data 2025", 
+    layout="wide",
+    page_icon="BLITZ LOGO.png")
 
 # --- UTILITY FUNCTIONS ---
 def to_excel(df: pd.DataFrame):
