@@ -6,7 +6,7 @@ import numpy as np
 import io
 import gc 
 
-# --- INITIAL SETUP ---
+# --- INITIAL SETUP & FUNCTIONS ---
 st.set_page_config(page_title="KSJ Data 2025", layout="wide")
 
 # --- UTILITY FUNCTIONS ---
@@ -67,9 +67,8 @@ def display_main_menu():
     with col1:
         with st.container(border=True):
             st.subheader("📊 All Data")
-            st.markdown("View raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
+            st.markdown("View all raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
             if st.button("Open Report", key="grup1_button", use_container_width=True):
-                # Inisialisasi state filter saat tombol ditekan, agar defaultnya menampilkan semua
                 df = st.session_state["main_df"]
                 st.session_state.grup1_filter_options = {}
                 for col in df.columns:
@@ -99,13 +98,11 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    # REVISI PERFORMA: Membungkus semua filter ke dalam st.form
     with st.expander("🔎 Filter Data", expanded=True):
         with st.form(key='filter_form'):
             filter_cols = st.columns(3)
             col_idx = 0
             
-            # Widget multiselect dibuat di dalam form
             temp_selections = {}
             for col, options in st.session_state.grup1_filter_options.items():
                 with filter_cols[col_idx]:
@@ -116,27 +113,23 @@ def display_grup_1():
                     )
                 col_idx = (col_idx + 1) % 3
             
-            # Hanya ada satu tombol "Apply"
             submitted = st.form_submit_button('Apply Filters', use_container_width=True)
             
             if submitted:
-                # Jika ditekan, update state utama dengan pilihan dari dalam form
                 st.session_state.grup1_selections = temp_selections
                 st.session_state.page_number = 0
                 st.rerun()
 
-    # Filter data hanya menggunakan state yang sudah final (dari 'grup1_selections')
     filtered_df = df
     for col, selected_values in st.session_state.grup1_selections.items():
         if selected_values and col in filtered_df.columns:
             filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
 
-    # Sisa halaman tidak berubah, hanya menggunakan filtered_df yang baru
     if not filtered_df.empty:
         PAGE_SIZE = 1000 
         if 'page_number' not in st.session_state:
             st.session_state.page_number = 0
-            
+        
         total_rows = len(filtered_df)
         total_pages = max(1, (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0))
         
@@ -177,7 +170,6 @@ def display_grup_1():
     else:
         st.info("No data to display for the selected filters.")
     
-    # REVISI PERFORMA: Lakukan agregasi berat hanya sekali
     if not filtered_df.empty:
         agg_data = filtered_df.groupby(['week', 'day', 'date']).agg(
             total_cups=('cups', 'sum'),
@@ -214,8 +206,6 @@ def display_grup_1():
         st.info("No data available for Week-on-Week Productivity based on current filters.")
         st.subheader("📅 Productivity by Day")
         st.info("No data available for Productivity by Day based on current filters.")
-
-# ... (KODE KARTU 2 DAN 3 TIDAK DIUBAH) ...
 
 def display_grup_2():
     if st.button("⬅️ Back to Menu"):
@@ -281,13 +271,9 @@ def display_grup_2():
     col2.metric(label=f"Product Sold (Week {latest_week})", value=f"{cups_latest_week:,}", delta=delta_cups_week)
     col3, col4 = st.columns(2)
     delta_revenue_month_formatted = f"Rp {delta_revenue_month:,.0f} vs Prv. Month".replace(",", ".")
-    color_month = "red" if delta_revenue_month < 0 else "green"
-    col3.metric(label=f"Blitz's Revenue ({latest_month_period})", value=f"Rp {revenue_latest_month:,.0f}".replace(",", "."))
-    col3.markdown(f"<span style='color:{color_month}; font-size: 0.8em;'>{'⬇️' if delta_revenue_month < 0 else '⬆️'} {delta_revenue_month_formatted}</span>", unsafe_allow_html=True)
-    delta_revenue_week_formatted = f"Rp {delta_revenue_week:,.0f} vs Prv. Week".replace(",", ".")
-    color_week = "red" if delta_revenue_week < 0 else "green"
-    col4.metric(label=f"Blitz's Revenue (Week {latest_week})", value=f"Rp {revenue_latest_week:,.0f}".replace(",", "."))
-    col4.markdown(f"<span style='color:{color_week}; font-size: 0.8em;'>{'⬇️' if delta_revenue_week < 0 else '⬆️'} {delta_revenue_week_formatted}</span>", unsafe_allow_html=True)
+    color_month = "normal" if delta_revenue_month == 0 else ("red" if delta_revenue_month < 0 else "green")
+    col3.metric(label=f"Blitz's Revenue ({latest_month_period})", value=f"Rp {revenue_latest_month:,.0f}".replace(",", "."), delta=f"Rp {delta_revenue_month:,.0f}".replace(",", "."))
+    col4.metric(label=f"Blitz's Revenue (Week {latest_week})", value=f"Rp {revenue_latest_week:,.0f}".replace(",", "."), delta=f"Rp {delta_revenue_week:,.0f}".replace(",", "."))
     st.markdown("---")
 
     st.subheader("Seller Retention Analysis")
@@ -340,7 +326,20 @@ def display_area_analysis():
 
     st.subheader("Time & Location Filters")
     all_weeks = sorted(df['week'].unique())
-    selected_weeks = st.multiselect("Select Week(s) to Analyze", options=all_weeks, default=all_weeks)
+    if 'area_week_selection' not in st.session_state:
+        st.session_state.area_week_selection = all_weeks
+    def select_all_weeks_area():
+        st.session_state.area_week_selection = all_weeks
+    def unselect_all_weeks_area():
+        st.session_state.area_week_selection = []
+    c1, c2, c3 = st.columns([4, 1, 1])
+    with c1:
+        selected_weeks = st.multiselect("Select Week(s) to Analyze",options=all_weeks,default=st.session_state.area_week_selection,key="area_week_multiselect")
+        st.session_state.area_week_selection = selected_weeks
+    with c2:
+        st.button("Select All", on_click=select_all_weeks_area, use_container_width=True)
+    with c3:
+        st.button("Unselect All", on_click=unselect_all_weeks_area, use_container_width=True)
     
     if not selected_weeks:
         st.warning("Please select at least one week to continue.")
@@ -452,38 +451,40 @@ def display_area_analysis():
 
     st.markdown("---")
     st.subheader("Outlet Supply vs. Demand Analysis")
-    daily_sales = df_filtered.groupby(['outlet', 'date'])['cups'].sum().reset_index()
-    demand_summary = daily_sales.groupby('outlet')['cups'].mean().reset_index().rename(columns={'cups': 'demand'})
-    supply_summary = df_filtered.groupby('outlet')['ridername'].nunique().reset_index().rename(columns={'ridername': 'supply'})
-    supply_demand_summary = pd.merge(demand_summary, supply_summary, on='outlet', how='left').fillna(0)
-    supply_demand_summary['ratio'] = supply_demand_summary.apply(lambda row: row['supply'] / row['demand'] if row['demand'] > 0 else 0, axis=1)
-    supply_demand_summary['status'] = supply_demand_summary['ratio'].apply(lambda x: "Productive" if (x > 0 and x <= 0.0222) else "Not Productive")
-    status_options = ["Productive", "Not Productive"]
-    selected_statuses = st.multiselect("Filter by Status", options=status_options, default=status_options)
-    final_sd_df = supply_demand_summary[supply_demand_summary['status'].isin(selected_statuses)] if selected_statuses else supply_demand_summary
+    if not df_filtered.empty:
+        daily_sales = df_filtered.groupby(['outlet', 'date'])['cups'].sum().reset_index()
+        demand_summary = daily_sales.groupby('outlet')['cups'].mean().reset_index().rename(columns={'cups': 'demand'})
+        supply_summary = df_filtered.groupby('outlet')['ridername'].nunique().reset_index().rename(columns={'ridername': 'supply'})
+        supply_demand_summary = pd.merge(demand_summary, supply_summary, on='outlet', how='left').fillna(0)
+        supply_demand_summary['ratio'] = supply_demand_summary.apply(lambda row: row['supply'] / row['demand'] if row['demand'] > 0 else 0, axis=1)
+        supply_demand_summary['status'] = supply_demand_summary['ratio'].apply(lambda x: "Productive" if (x > 0 and x <= 0.0222) else "Not Productive")
+        status_options = ["Productive", "Not Productive"]
+        selected_statuses = st.multiselect("Filter by Status", options=status_options, default=status_options)
+        final_sd_df = supply_demand_summary[supply_demand_summary['status'].isin(selected_statuses)] if selected_statuses else supply_demand_summary
 
-    if not final_sd_df.empty:
-        st.dataframe(
-            final_sd_df.rename(columns={'outlet': 'Outlet', 'demand': 'Avg Daily Demand', 'supply': 'Sellers', 'ratio': 'Ratio', 'status': 'Status'}),
-            use_container_width=True, hide_index=True,
-            column_config={"Avg Daily Demand": st.column_config.NumberColumn(format="%.2f"), "Ratio": st.column_config.NumberColumn(format="%.4f")}
-        )
-        st.download_button(
-            label="📥 Export Supply vs Demand to Excel",
-            data=to_excel(final_sd_df),
-            file_name="outlet_supply_demand_analysis.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        fig_sd = px.scatter(
-            final_sd_df, x="demand", y="supply", hover_name="outlet", color="status",
-            title="Supply (Sellers) vs. Average Daily Demand (Cups) per Outlet",
-            labels={"demand": "Average Daily Demand (Cups)", "supply": "Total Unique Sellers", "status": "Status"}
-        )
-        max_val = max(final_sd_df['demand'].max(), final_sd_df['supply'].max()) if not final_sd_df.empty else 1
-        fig_sd.add_shape(type='line', x0=0, y0=0, x1=max_val, y1=max_val, line=dict(color='Gray', dash='dash'))
-        st.plotly_chart(fig_sd, use_container_width=True)
-    else:
-        st.info("No supply/demand data available for the current filter selection.")
+        if not final_sd_df.empty:
+            st.dataframe(
+                final_sd_df.rename(columns={'outlet': 'Outlet', 'demand': 'Avg Daily Demand', 'supply': 'Sellers', 'ratio': 'Ratio', 'status': 'Status'}),
+                use_container_width=True, hide_index=True,
+                column_config={"Avg Daily Demand": st.column_config.NumberColumn(format="%.2f"), "Ratio": st.column_config.NumberColumn(format="%.4f")}
+            )
+            st.download_button(
+                label="📥 Export Supply vs Demand to Excel",
+                data=to_excel(final_sd_df),
+                file_name="outlet_supply_demand_analysis.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            fig_sd = px.scatter(
+                final_sd_df, x="demand", y="supply", hover_name="outlet", color="status",
+                title="Supply (Sellers) vs. Average Daily Demand (Cups) per Outlet",
+                labels={"demand": "Average Daily Demand (Cups)", "supply": "Total Unique Sellers", "status": "Status"}
+            )
+            fig_sd.update_yaxes(range=[0, 150])
+            max_val = max(final_sd_df['demand'].max(), final_sd_df['supply'].max()) if not final_sd_df.empty else 1
+            fig_sd.add_shape(type='line', x0=0, y0=0, x1=max_val, y1=max_val, line=dict(color='Gray', dash='dash'))
+            st.plotly_chart(fig_sd, use_container_width=True)
+        else:
+            st.info("No supply/demand data available for the current filter selection.")
 
 
 # --- MAIN APPLICATION FLOW ---
@@ -506,7 +507,7 @@ else:
     if "main_df" not in st.session_state:
         with st.spinner("Processing Your Data. Please wait... :)"):
             st.session_state["main_df"] = load_and_process_main_data()
-            
+        
     if 'page_number' not in st.session_state:
         st.session_state.page_number = 0
             
