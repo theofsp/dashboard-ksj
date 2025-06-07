@@ -58,7 +58,7 @@ def display_main_menu():
             st.button("Open Report", on_click=set_view, args=['grup_2'], key="grup2_button", use_container_width=True)
     with col3:
         with st.container(border=True):
-            st.subheader("📍 Area Analysis")
+            st.subheader("📍 Area & Outlet Analysis")
             st.markdown("In-depth analysis based on performance in each area.")
             st.button("Open Report", on_click=set_view, args=['area_analysis'], key="area_button", use_container_width=True)
 
