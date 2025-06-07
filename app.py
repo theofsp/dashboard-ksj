@@ -7,38 +7,30 @@ import numpy as np
 # --- INITIAL SETUP ---
 st.set_page_config(page_title="KSJ Data 2025", layout="wide")
 
-# --- UTILITY FUNCTIONS (DENGAN REVISI) ---
+# --- UTILITY FUNCTIONS ---
 def check_login(username, password):
-    """Memeriksa kredensial login dan me-refresh halaman."""
     if username == "Blitz" and password == "ksj2025":
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
-        st.rerun()  # REVISI: Langsung refresh untuk masuk ke dashboard.
+        st.rerun()
     else:
         st.session_state["logged_in"] = False
         st.session_state.pop("username", None)
         st.error("Incorrect Username or Password!")
 
 def logout():
-    """Membersihkan session state dan me-refresh halaman untuk logout."""
-    # Simpan beberapa kunci yang tidak ingin dihapus (jika ada)
-    keys_to_keep = [] 
-    # Hapus semua state lain untuk memastikan reset total
     for key in list(st.session_state.keys()):
-        if key not in keys_to_keep:
-            st.session_state.pop(key)
+        st.session_state.pop(key)
     st.session_state["logged_in"] = False
-    st.rerun() # REVISI: Langsung refresh untuk kembali ke halaman login.
+    st.rerun()
 
 def set_view(view_name):
-    """Mengatur halaman yang akan ditampilkan dan me-refresh."""
     st.session_state["view"] = view_name
-    st.rerun() # REVISI: Kunci untuk mengatasi masalah 'klik 2x' pada navigasi.
+    st.rerun()
 
-# --- DATA LOADING (TETAP SAMA) ---
+# --- DATA LOADING ---
 @st.cache_data
 def load_and_process_main_data():
-    """Memuat dan membersihkan data dari Excel, hanya sekali."""
     df = pd.read_excel("KSJ Data 2025.xlsx")
     df.columns = [col.strip().replace(" ", "").replace("#", "").lower() for col in df.columns]
     if 'date' in df.columns:
@@ -54,14 +46,12 @@ def load_and_process_main_data():
 
 # --- PAGE DISPLAY FUNCTIONS ---
 def display_main_menu():
-    """Menampilkan menu utama dengan 3 pilihan kartu."""
     st.header("Main Menu")
     st.markdown("Select an analysis to view from the options below.")
     col1, col2, col3 = st.columns(3, gap="large")
     with col1:
         with st.container(border=True):
             st.subheader("📊 All Data")
-            # REVISI: Teks diseragamkan panjangnya untuk menyamakan tinggi kartu.
             st.markdown("View raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
             if st.button("Open Report", key="grup1_button", use_container_width=True):
                 set_view('grup_1')
@@ -74,13 +64,11 @@ def display_main_menu():
     with col3:
         with st.container(border=True):
             st.subheader("📍 Area & Outlet Analysis")
-            # REVISI: Teks diseragamkan panjangnya untuk menyamakan tinggi kartu.
             st.markdown("Drill down into area-specific performance, with detailed location and outlet-level breakdowns.")
             if st.button("Open Report", key="area_button", use_container_width=True):
                 set_view('area_analysis')
 
 def display_grup_1():
-    """Menampilkan halaman 'All Data' dengan filter dan visualisasi."""
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
         return
@@ -89,34 +77,59 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    # REVISI: Logika filter disederhanakan untuk mengatasi kelambatan dan 'nyangkut'.
+    # REVISI 2: Logika filter dirombak total untuk memperbaiki semua masalah
     if 'grup1_filters' not in st.session_state:
         st.session_state.grup1_filters = {}
+        # Inisialisasi daftar OPSI filter
+        st.session_state.grup1_filter_options = {}
         for col in df.columns:
-            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 100:
-                st.session_state.grup1_filters[col] = sorted(df[col].dropna().unique())
+            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200: # Naikkan limit sedikit jika perlu
+                options = sorted(df[col].dropna().unique())
+                st.session_state.grup1_filter_options[col] = options
+                st.session_state.grup1_filters[col] = options # Defaultnya pilih semua
 
-    with st.expander("🔎 Filter Data", expanded=False):
+    # Fungsi helper untuk tombol Select All / Clear
+    def select_all(filter_key):
+        st.session_state.grup1_filters[filter_key] = st.session_state.grup1_filter_options[filter_key]
+
+    def clear_all(filter_key):
+        st.session_state.grup1_filters[filter_key] = []
+
+    with st.expander("🔎 Filter Data", expanded=True):
         st.write("Apply filters below. Data will update automatically.")
+        
         filter_cols = st.columns(3)
         col_idx = 0
-        for col, unique_vals in st.session_state.grup1_filters.items():
+
+        for col, options in st.session_state.grup1_filter_options.items():
             with filter_cols[col_idx]:
                 st.session_state.grup1_filters[col] = st.multiselect(
                     f"Select {col.title()}",
-                    options=unique_vals,
+                    options=options,
                     default=st.session_state.grup1_filters.get(col, []),
                     key=f"multiselect_{col}_g1"
                 )
+                
+                # REVISI 2: Mengembalikan tombol Select All / Clear dengan metode stabil
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.button("Select All", key=f"all_{col}", on_click=select_all, args=[col], use_container_width=True)
+                with c2:
+                    st.button("Clear", key=f"clear_{col}", on_click=clear_all, args=[col], use_container_width=True)
+
             col_idx = (col_idx + 1) % 3
 
+    # REVISI 2: Memperbaiki logika penerapan filter
     filtered_df = df.copy()
     for col, selected_values in st.session_state.grup1_filters.items():
-        if not selected_values:
-            filtered_df = pd.DataFrame(columns=df.columns)
-            break
-        filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
-            
+        # Hanya terapkan filter JIKA ada sesuatu yang dipilih.
+        # Jika kosong, artinya "pilih semua" untuk kolom tsb.
+        if selected_values:
+            # Pastikan hanya memfilter jika kolomnya ada di dataframe
+            if col in filtered_df.columns:
+                 filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
+    
+    # Bagian selanjutnya tidak ada perubahan, hanya menggunakan filtered_df yang sudah benar
     if not filtered_df.empty:
         styled_df = filtered_df.copy()
         if 'date' in styled_df.columns:
@@ -170,7 +183,6 @@ def display_grup_1():
         st.warning("Column 'day', 'ridername', or 'cups' is not available.")
 
 def display_grup_2():
-    """Menampilkan halaman 'Business Dashboard'."""
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
         return
@@ -277,7 +289,6 @@ def display_grup_2():
         st.warning("Cannot perform retention analysis. Required columns 'week' or 'ridername' not found or no data.")
 
 def display_area_analysis():
-    """Menampilkan halaman 'Area & Outlet Analysis'."""
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
         return
@@ -338,45 +349,41 @@ def display_area_analysis():
     chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet', 'cups': 'Cups Sold'}
     col_revenue_chart, col_cups_chart = st.columns(2)
 
-    # Logika untuk grafik revenue
     with col_revenue_chart:
-        title_revenue = "Revenue Breakdown"
         if selected_outlet != 'All Outlets':
-            data_to_plot_revenue = df_filtered.groupby('week')['revenue'].sum().reset_index()
-            fig_revenue = px.line(data_to_plot_revenue, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels)
+            data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
+            fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels)
         elif selected_district != 'All Districts':
-            data_to_plot_revenue = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig_revenue = px.bar(data_to_plot_revenue, x='outlet', y='revenue', title=f"Revenue by Outlet in {selected_district}", labels=chart_labels)
+            data_to_plot = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+            fig = px.bar(data_to_plot, x='outlet', y='revenue', title=f"Revenue by Outlet in {selected_district}", labels=chart_labels)
         elif selected_city != 'All Cities':
-            data_to_plot_revenue = df_filtered.groupby('district')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig_revenue = px.bar(data_to_plot_revenue, x='district', y='revenue', title=f"Revenue by District in {selected_city}", labels=chart_labels)
+            data_to_plot = df_filtered.groupby('district')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+            fig = px.bar(data_to_plot, x='district', y='revenue', title=f"Revenue by District in {selected_city}", labels=chart_labels)
         elif selected_area != 'All Areas':
-            data_to_plot_revenue = df_filtered.groupby('city')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig_revenue = px.bar(data_to_plot_revenue, x='city', y='revenue', title=f"Revenue by City in {selected_area}", labels=chart_labels)
-        else: # All Areas
-            data_to_plot_revenue = df_filtered.groupby('area')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig_revenue = px.bar(data_to_plot_revenue, x='area', y='revenue', title="Overall Revenue by Area", labels=chart_labels)
-        st.plotly_chart(fig_revenue, use_container_width=True)
+            data_to_plot = df_filtered.groupby('city')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+            fig = px.bar(data_to_plot, x='city', y='revenue', title=f"Revenue by City in {selected_area}", labels=chart_labels)
+        else:
+            data_to_plot = df_filtered.groupby('area')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+            fig = px.bar(data_to_plot, x='area', y='revenue', title="Overall Revenue by Area", labels=chart_labels)
+        st.plotly_chart(fig, use_container_width=True)
 
-    # Logika untuk grafik cups
     with col_cups_chart:
-        title_cups = "Cups Sold Breakdown"
         if selected_outlet != 'All Outlets':
-            data_to_plot_cups = df_filtered.groupby('week')['cups'].sum().reset_index()
-            fig_cups = px.line(data_to_plot_cups, x='week', y='cups', title=f"Weekly Cups Sold for {selected_outlet}", markers=True, labels=chart_labels)
+            data_to_plot = df_filtered.groupby('week')['cups'].sum().reset_index()
+            fig = px.line(data_to_plot, x='week', y='cups', title=f"Weekly Cups Sold for {selected_outlet}", markers=True, labels=chart_labels)
         elif selected_district != 'All Districts':
-            data_to_plot_cups = df_filtered.groupby('outlet')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot_cups, x='outlet', y='cups', title=f"Cups Sold by Outlet in {selected_district}", labels=chart_labels)
+            data_to_plot = df_filtered.groupby('outlet')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+            fig = px.bar(data_to_plot, x='outlet', y='cups', title=f"Cups Sold by Outlet in {selected_district}", labels=chart_labels)
         elif selected_city != 'All Cities':
-            data_to_plot_cups = df_filtered.groupby('district')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot_cups, x='district', y='cups', title=f"Cups Sold by District in {selected_city}", labels=chart_labels)
+            data_to_plot = df_filtered.groupby('district')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+            fig = px.bar(data_to_plot, x='district', y='cups', title=f"Cups Sold by District in {selected_city}", labels=chart_labels)
         elif selected_area != 'All Areas':
-            data_to_plot_cups = df_filtered.groupby('city')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot_cups, x='city', y='cups', title=f"Cups Sold by City in {selected_area}", labels=chart_labels)
-        else: # All Areas
-            data_to_plot_cups = df_filtered.groupby('area')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot_cups, x='area', y='cups', title="Overall Cups Sold by Area", labels=chart_labels)
-        st.plotly_chart(fig_cups, use_container_width=True)
+            data_to_plot = df_filtered.groupby('city')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+            fig = px.bar(data_to_plot, x='city', y='cups', title=f"Cups Sold by City in {selected_area}", labels=chart_labels)
+        else:
+            data_to_plot = df_filtered.groupby('area')['cups'].sum().reset_index().sort_values('cups', ascending=False)
+            fig = px.bar(data_to_plot, x='area', y='cups', title="Overall Cups Sold by Area", labels=chart_labels)
+        st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     st.subheader("District Productivity Ranking")
@@ -446,11 +453,10 @@ if "logged_in" not in st.session_state:
 if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        # Ganti "BLITZ LOGO.png" dengan path yang benar jika logo tidak ada di folder yang sama
         try:
             st.image("BLITZ LOGO.png", width=150)
         except FileNotFoundError:
-            st.warning("Logo file not found. Please place 'BLITZ LOGO.png' in the same folder.")
+            st.warning("Logo file 'BLITZ LOGO.png' not found.")
         st.title("Login - KSJ Data Dashboard")
         username_input = st.text_input("Username", placeholder="Enter your username")
         password_input = st.text_input("Password", type="password", placeholder="Enter your password")
@@ -466,7 +472,7 @@ else:
         try:
             st.image("BLITZ LOGO.png", width=80)
         except FileNotFoundError:
-            pass # Jangan tampilkan warning lagi jika sudah login
+            pass
     with col2:
         st.title("📊 KSJ Data 2025")
         
