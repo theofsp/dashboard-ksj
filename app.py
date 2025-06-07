@@ -37,7 +37,7 @@ def load_and_process_main_data():
     try:
         df = pd.read_parquet("KSJ_Data_2025.parquet")
     except FileNotFoundError:
-        st.warning("File Parquet tidak ditemukan, fallback ke Excel. Performa mungkin lebih lambat. Pertimbangkan untuk menjalankan skrip konversi.")
+        st.warning("If the performance feels slow, please leave this page idle for about 10–15 seconds while the system loads the data :)")
         df = pd.read_excel("KSJ Data 2025.xlsx")
 
     df.columns = [col.strip().replace(" ", "").replace("#", "").lower() for col in df.columns]
