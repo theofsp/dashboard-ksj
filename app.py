@@ -73,60 +73,64 @@ def display_grup_1():
     st.subheader("📄 All Data")
     
     # Inisialisasi session state untuk filter jika belum ada
-    if 'grup1_filters_state' not in st.session_state:
-        st.session_state['grup1_filters_state'] = {}
+    if 'grup1_current_filters' not in st.session_state:
+        st.session_state['grup1_current_filters'] = {}
         # Populate initial filter states based on unique values
         for col in df.columns:
             if df[col].dtype != 'datetime64[ns]':
                 unique_vals = df[col].dropna().unique()
                 if len(unique_vals) < 100:
-                    st.session_state['grup1_filters_state'][col] = sorted(unique_vals) # Default to all selected
-    
-    # Inisialisasi filtered_df untuk digunakan oleh grafik & tabel
-    if 'grup1_filtered_df' not in st.session_state:
-        st.session_state['grup1_filtered_df'] = df.copy() # Default: Tampilkan semua data awal
+                    st.session_state['grup1_current_filters'][col] = sorted(unique_vals) # Default to all selected
+
+    # Inisialisasi filtered_df yang akan digunakan oleh semua bagian di display_grup_1
+    filtered_df = df.copy() 
 
     with st.expander("🔎 Filter"):
+        st.write("Apply filters below. Changes will reflect automatically.")
         for col in df.columns:
             if df[col].dtype != 'datetime64[ns]':
                 unique_vals = df[col].dropna().unique()
-                if len(unique_vals) < 100:
+                if len(unique_vals) < 100: # Limit number of unique values for multiselect
                     default_vals = sorted(unique_vals)
-                    select_all_key = f"all_filter_{col}_g1" # Unique key
                     
-                    # Set default value for checkbox based on current multiselect state
-                    is_all_selected = (len(st.session_state['grup1_filters_state'].get(col, [])) == len(default_vals))
+                    # Logic for "Select All" checkbox
+                    # Check if all items are currently selected in the multiselect
+                    is_all_selected_for_col = (len(st.session_state['grup1_current_filters'].get(col, [])) == len(default_vals))
 
-                    select_all = st.checkbox(f"Select All {col.title()}", value=is_all_selected, key=select_all_key)
+                    col_sel_all, col_multiselect = st.columns([1,4]) # Using columns to align checkbox and multiselect
+                    with col_sel_all:
+                        select_all_checkbox = st.checkbox(f"All {col.title()}", value=is_all_selected_for_col, key=f"checkbox_{col}_g1")
                     
-                    # Update selected_vals based on checkbox or manual selection
-                    if select_all:
-                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=default_vals, key=f"multiselect_{col}_g1")
-                    else:
-                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=st.session_state['grup1_filters_state'].get(col, []), key=f"multiselect_{col}_g1")
+                    with col_multiselect:
+                        if select_all_checkbox:
+                            current_selected_vals = st.multiselect(
+                                f"Select {col.title()}", 
+                                options=default_vals, 
+                                default=default_vals, 
+                                key=f"multiselect_{col}_g1"
+                            )
+                        else:
+                            current_selected_vals = st.multiselect(
+                                f"Select {col.title()}", 
+                                options=default_vals, 
+                                default=st.session_state['grup1_current_filters'].get(col, []), # Keep previous selection if unselected
+                                key=f"multiselect_{col}_g1"
+                            )
                     
                     # Update session state with current selections
-                    st.session_state['grup1_filters_state'][col] = current_selected_vals
+                    st.session_state['grup1_current_filters'][col] = current_selected_vals
     
-    # Logic to apply filters and update session state when "Show Data" button is clicked
-    if st.button("🔄 Show Data"):
-        temp_df = df.copy() # Start with full dataframe
-        # Apply filters from session state
-        for col, vals in st.session_state['grup1_filters_state'].items():
-            if vals: # Only filter if there are values selected for this column
-                temp_df = temp_df[temp_df[col].isin(vals)]
-            else: # If no values selected for a column, effectively empty the DataFrame
-                temp_df = pd.DataFrame(columns=temp_df.columns) 
-                break # No need to check other filters, result is already empty
-        
-        st.session_state['grup1_filtered_df'] = temp_df # Simpan hasil filter ke session state
-    
-    # Gunakan st.session_state['grup1_filtered_df'] untuk menampilkan data dan grafik
-    current_filtered_df = st.session_state['grup1_filtered_df']
+    # Apply all filters from session state to create the final filtered_df
+    for col, vals in st.session_state['grup1_current_filters'].items():
+        if vals: # Only filter if there are values selected for this column
+            filtered_df = filtered_df[filtered_df[col].isin(vals)]
+        else: # If no values selected for a column, effectively empty the DataFrame
+            filtered_df = pd.DataFrame(columns=filtered_df.columns) 
+            break # No need to check other filters, result is already empty
 
     # Tampilkan dataframe
-    if not current_filtered_df.empty:
-        styled_df = current_filtered_df.copy()
+    if not filtered_df.empty:
+        styled_df = filtered_df.copy()
         if 'date' in styled_df.columns:
             styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
         for col in ['selling', 'revenue']:
@@ -138,11 +142,11 @@ def display_grup_1():
         st.info("No data to display for the selected filters.")
             
     st.subheader("📈 Week-on-Week Productivity")
-    # Bagian grafik ini sekarang menggunakan current_filtered_df
-    if 'week' in current_filtered_df.columns and 'cups' in current_filtered_df.columns and 'revenue' in current_filtered_df.columns:
-        if not current_filtered_df.empty:
-            df_chart_cups = current_filtered_df.groupby('week')['cups'].sum().reset_index()
-            df_chart_revenue = current_filtered_df.groupby('week')['revenue'].sum().reset_index()
+    # Bagian grafik ini sekarang menggunakan filtered_df
+    if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
+        if not filtered_df.empty:
+            df_chart_cups = filtered_df.groupby('week')['cups'].sum().reset_index()
+            df_chart_revenue = filtered_df.groupby('week')['revenue'].sum().reset_index()
 
             col1, col2 = st.columns(2)
             with col1:
@@ -159,10 +163,10 @@ def display_grup_1():
         st.warning("Column 'week', 'cups', or 'revenue' is not available for charting.")
         
     st.subheader("📅 Productivity by Day")
-    # Bagian grafik ini juga sekarang menggunakan current_filtered_df
-    if 'day' in current_filtered_df.columns and 'cups' in current_filtered_df.columns and 'ridername' in current_filtered_df.columns:
-        if not current_filtered_df.empty:
-            df_day = current_filtered_df.copy()
+    # Bagian grafik ini juga sekarang menggunakan filtered_df
+    if 'day' in filtered_df.columns and 'cups' in filtered_df.columns and 'ridername' in filtered_df.columns:
+        if not filtered_df.empty:
+            df_day = filtered_df.copy()
             daily_stats = df_day.groupby(['day', 'date']).agg(total_cups=('cups', 'sum'), unique_riders=('ridername', 'nunique')).reset_index()
             
             avg_sellers_day = daily_stats.groupby('day')['unique_riders'].mean().round(0).astype(int).reset_index(name='avg_sellers')
