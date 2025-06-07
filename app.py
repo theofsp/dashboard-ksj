@@ -69,6 +69,13 @@ def display_main_menu():
             st.subheader("📊 All Data")
             st.markdown("View raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
             if st.button("Open Report", key="grup1_button", use_container_width=True):
+                # Inisialisasi state filter saat tombol ditekan, agar defaultnya menampilkan semua
+                df = st.session_state["main_df"]
+                st.session_state.grup1_filter_options = {}
+                for col in df.columns:
+                    if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200:
+                        st.session_state.grup1_filter_options[col] = sorted(df[col].dropna().unique())
+                st.session_state.grup1_selections = {col: options for col, options in st.session_state.grup1_filter_options.items()}
                 set_view('grup_1')
     with col2:
         with st.container(border=True):
@@ -92,53 +99,39 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    if 'grup1_filter_options' not in st.session_state:
-        st.session_state.grup1_filter_options = {}
-        for col in df.columns:
-            if df[col].dtype != 'datetime64[ns]' and len(df[col].dropna().unique()) < 200:
-                st.session_state.grup1_filter_options[col] = sorted(df[col].dropna().unique())
-    
-    if 'grup1_selections' not in st.session_state:
-        st.session_state.grup1_selections = {col: options for col, options in st.session_state.grup1_filter_options.items()}
-
+    # REVISI PERFORMA: Membungkus semua filter ke dalam st.form
     with st.expander("🔎 Filter Data", expanded=True):
         with st.form(key='filter_form'):
             filter_cols = st.columns(3)
             col_idx = 0
+            
+            # Widget multiselect dibuat di dalam form
             temp_selections = {}
             for col, options in st.session_state.grup1_filter_options.items():
                 with filter_cols[col_idx]:
                     temp_selections[col] = st.multiselect(
                         f"Select {col.title()}",
                         options=options,
-                        default=st.session_state.grup1_selections.get(col, []),
-                        key=f"multiselect_{col}"
+                        default=st.session_state.grup1_selections.get(col, [])
                     )
                 col_idx = (col_idx + 1) % 3
             
-            c1, c2, c3 = st.columns([2,1,1])
-            with c1:
-                submitted = st.form_submit_button('Apply Filters', use_container_width=True)
-            with c2:
-                if st.form_submit_button('Select All Filters'):
-                    st.session_state.grup1_selections = {col: options for col, options in st.session_state.grup1_filter_options.items()}
-                    submitted = True 
-            with c3:
-                if st.form_submit_button('Clear All Filters'):
-                    for col in st.session_state.grup1_filter_options.keys():
-                        st.session_state.grup1_selections[col] = []
-                    submitted = True
+            # Hanya ada satu tombol "Apply"
+            submitted = st.form_submit_button('Apply Filters', use_container_width=True)
             
             if submitted:
+                # Jika ditekan, update state utama dengan pilihan dari dalam form
                 st.session_state.grup1_selections = temp_selections
-                st.session_state.page_number = 0 # Reset halaman ke 1 setiap kali filter baru diterapkan
+                st.session_state.page_number = 0
                 st.rerun()
 
+    # Filter data hanya menggunakan state yang sudah final (dari 'grup1_selections')
     filtered_df = df
     for col, selected_values in st.session_state.grup1_selections.items():
         if selected_values and col in filtered_df.columns:
             filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
 
+    # Sisa halaman tidak berubah, hanya menggunakan filtered_df yang baru
     if not filtered_df.empty:
         PAGE_SIZE = 1000 
         if 'page_number' not in st.session_state:
@@ -147,7 +140,6 @@ def display_grup_1():
         total_rows = len(filtered_df)
         total_pages = max(1, (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0))
         
-        # Pastikan page_number tidak out of bounds setelah filter
         if st.session_state.page_number >= total_pages:
             st.session_state.page_number = 0
 
@@ -164,10 +156,8 @@ def display_grup_1():
                 st.rerun()
 
         st.download_button(
-             label="📥 Export All Data to Excel",
-             data=to_excel(filtered_df), 
-             file_name=f"all_data_export_filtered.xlsx",
-             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             label="📥 Export All Data to Excel", data=to_excel(filtered_df), 
+             file_name=f"all_data_export_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
              use_container_width=True
          )
 
@@ -184,26 +174,19 @@ def display_grup_1():
         styled_df.columns = [col.title() for col in styled_df.columns]
         
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
-
     else:
         st.info("No data to display for the selected filters.")
     
-    # --- REVISI PERFORMA: Lakukan agregasi berat hanya sekali ---
+    # REVISI PERFORMA: Lakukan agregasi berat hanya sekali
     if not filtered_df.empty:
-        # Buat satu tabel agregat untuk semua kebutuhan grafik di bawah
         agg_data = filtered_df.groupby(['week', 'day', 'date']).agg(
             total_cups=('cups', 'sum'),
             total_revenue=('revenue', 'sum'),
             unique_riders=('ridername', 'nunique')
         ).reset_index()
 
-        # --- Grafik 1 & 2: Dibuat dari tabel agregat kecil, bukan filtered_df besar ---
         st.subheader("📈 Week-on-Week Productivity")
-        weekly_summary = agg_data.groupby('week').agg(
-            cups=('total_cups', 'sum'),
-            revenue=('total_revenue', 'sum')
-        ).reset_index()
-
+        weekly_summary = agg_data.groupby('week').agg(cups=('total_cups', 'sum'), revenue=('total_revenue', 'sum')).reset_index()
         col1, col2 = st.columns(2)
         with col1:
             fig_cups = px.bar(weekly_summary, x='week', y='cups', title='Total Cups per Week', labels={'cups': 'Cups Sold', 'week': 'Week'}, text_auto=True)
@@ -214,34 +197,25 @@ def display_grup_1():
             fig_revenue.update_yaxes(title_text='Total Revenue (Rp)')
             st.plotly_chart(fig_revenue, use_container_width=True)
 
-        # --- Grafik 3 & 4: Dibuat dari tabel agregat kecil ---
         st.subheader("📅 Productivity by Day")
         day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        
         total_cups_day = agg_data.groupby('day')['total_cups'].sum().reset_index()
         avg_sellers_day = agg_data.groupby('day')['unique_riders'].mean().round(0).astype(int).reset_index(name='avg_sellers')
-        
         agg_data['productivity'] = agg_data.apply(lambda row: row['total_cups'] / row['unique_riders'] if row['unique_riders'] > 0 else 0, axis=1)
         avg_productivity_day = agg_data.groupby('day')['productivity'].mean().round(0).astype(int).reset_index(name='avg_productivity')
-        
         day_summary = pd.merge(total_cups_day, avg_sellers_day, on='day').merge(avg_productivity_day, on='day')
         day_summary['day'] = pd.Categorical(day_summary['day'], categories=day_order, ordered=True)
         day_summary = day_summary.sort_values('day')
-
         st.dataframe(day_summary.rename(columns={'day': 'Day','total_cups': 'Total Cups','avg_sellers': 'Avg. Sellers','avg_productivity': 'Avg. Cups Sold Per Day'}), use_container_width=True, hide_index=True)
         pie_fig = px.pie(day_summary, names='day', values='total_cups', title='Cups Sold by Day', category_orders={'day': day_order})
         st.plotly_chart(pie_fig, use_container_width=True)
     else:
-        # Jika filtered_df kosong, tampilkan info di bagian grafik juga
         st.subheader("📈 Week-on-Week Productivity")
         st.info("No data available for Week-on-Week Productivity based on current filters.")
         st.subheader("📅 Productivity by Day")
         st.info("No data available for Productivity by Day based on current filters.")
 
-
-# =====================================================================================
-# KODE UNTUK KARTU 2 DAN 3 DI BAWAH INI TIDAK DIUBAH SAMA SEKALI
-# =====================================================================================
+# ... (KODE KARTU 2 DAN 3 TIDAK DIUBAH) ...
 
 def display_grup_2():
     if st.button("⬅️ Back to Menu"):
