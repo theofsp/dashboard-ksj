@@ -11,7 +11,6 @@ st.set_page_config(page_title="KSJ Data 2025", layout="wide")
 
 # --- UTILITY FUNCTIONS ---
 def to_excel(df: pd.DataFrame):
-    """Konversi DataFrame ke format Excel di memori."""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Sheet1')
@@ -19,7 +18,6 @@ def to_excel(df: pd.DataFrame):
     return processed_data
 
 def check_login(username, password):
-    """Memeriksa kredensial login."""
     if username == "Blitz" and password == "ksj2025":
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
@@ -30,7 +28,6 @@ def check_login(username, password):
         st.error("Incorrect Username or Password!")
 
 def logout():
-    """Membersihkan session state saat logout."""
     for key in list(st.session_state.keys()):
         st.session_state.pop(key)
     st.session_state["logged_in"] = False
@@ -38,7 +35,6 @@ def logout():
     st.rerun()
 
 def set_view(view_name):
-    """Mengatur halaman yang akan ditampilkan."""
     st.session_state["view"] = view_name
     st.session_state.page_number = 0 
     st.rerun()
@@ -46,8 +42,6 @@ def set_view(view_name):
 # --- DATA LOADING ---
 @st.cache_data
 def load_and_process_main_data():
-    """Memuat data dari Parquet (prioritas) atau Excel (fallback)."""
-    # REVISI 1: Menghapus semua notifikasi (toast dan warning)
     try:
         df = pd.read_parquet("KSJ_Data_2025.parquet")
     except FileNotFoundError:
@@ -98,7 +92,6 @@ def display_grup_1():
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
 
-    # REVISI 2: Perbaikan Performa Filter dengan st.form
     if 'grup1_filter_options' not in st.session_state:
         st.session_state.grup1_filter_options = {}
         for col in df.columns:
@@ -112,7 +105,6 @@ def display_grup_1():
         with st.form(key='filter_form'):
             filter_cols = st.columns(3)
             col_idx = 0
-            # Buat widget di dalam form
             temp_selections = {}
             for col, options in st.session_state.grup1_filter_options.items():
                 with filter_cols[col_idx]:
@@ -124,52 +116,48 @@ def display_grup_1():
                     )
                 col_idx = (col_idx + 1) % 3
             
-            # Tombol utama untuk menerapkan filter
             c1, c2, c3 = st.columns([2,1,1])
             with c1:
                 submitted = st.form_submit_button('Apply Filters', use_container_width=True)
             with c2:
                 if st.form_submit_button('Select All Filters'):
-                    # Jika ditekan, set semua pilihan ke opsi penuh dan update state
-                    for col, options in st.session_state.grup1_filter_options.items():
-                        st.session_state.grup1_selections[col] = options
-                    submitted = True # Anggap form di-submit
+                    st.session_state.grup1_selections = {col: options for col, options in st.session_state.grup1_filter_options.items()}
+                    submitted = True 
             with c3:
                 if st.form_submit_button('Clear All Filters'):
-                    # Jika ditekan, kosongkan semua pilihan dan update state
                     for col in st.session_state.grup1_filter_options.keys():
                         st.session_state.grup1_selections[col] = []
-                    submitted = True # Anggap form di-submit
+                    submitted = True
             
-            # Jika form di-submit, update state utama dengan pilihan dari dalam form
             if submitted:
                 st.session_state.grup1_selections = temp_selections
+                st.session_state.page_number = 0 # Reset halaman ke 1 setiap kali filter baru diterapkan
+                st.rerun()
 
-    # Filter data hanya menggunakan state yang sudah final
     filtered_df = df
     for col, selected_values in st.session_state.grup1_selections.items():
-        if selected_values:
-            if col in filtered_df.columns:
-                 filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
+        if selected_values and col in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
 
-    # Sisa halaman tidak berubah, hanya menggunakan filtered_df yang baru
     if not filtered_df.empty:
         PAGE_SIZE = 1000 
-        
         if 'page_number' not in st.session_state:
             st.session_state.page_number = 0
             
         total_rows = len(filtered_df)
-        total_pages = (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0)
+        total_pages = max(1, (total_rows // PAGE_SIZE) + (1 if total_rows % PAGE_SIZE > 0 else 0))
         
+        # Pastikan page_number tidak out of bounds setelah filter
+        if st.session_state.page_number >= total_pages:
+            st.session_state.page_number = 0
+
         prev_col, mid_col, next_col = st.columns([2, 3, 2])
         with prev_col:
             if st.button("⬅️ Previous Page", use_container_width=True, disabled=(st.session_state.page_number == 0)):
                 st.session_state.page_number -= 1
                 st.rerun()
         with mid_col:
-            display_page_number = st.session_state.page_number + 1 if total_pages > 0 else 0
-            st.markdown(f"<div style='text-align: center; margin-top: 1rem;'>Page {display_page_number} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: center; margin-top: 1rem;'>Page {st.session_state.page_number + 1} of {total_pages} ({total_rows} total rows)</div>", unsafe_allow_html=True)
         with next_col:
             if st.button("Next Page ➡️", use_container_width=True, disabled=(st.session_state.page_number >= total_pages - 1)):
                 st.session_state.page_number += 1
@@ -199,49 +187,60 @@ def display_grup_1():
 
     else:
         st.info("No data to display for the selected filters.")
+    
+    # --- REVISI PERFORMA: Lakukan agregasi berat hanya sekali ---
+    if not filtered_df.empty:
+        # Buat satu tabel agregat untuk semua kebutuhan grafik di bawah
+        agg_data = filtered_df.groupby(['week', 'day', 'date']).agg(
+            total_cups=('cups', 'sum'),
+            total_revenue=('revenue', 'sum'),
+            unique_riders=('ridername', 'nunique')
+        ).reset_index()
+
+        # --- Grafik 1 & 2: Dibuat dari tabel agregat kecil, bukan filtered_df besar ---
+        st.subheader("📈 Week-on-Week Productivity")
+        weekly_summary = agg_data.groupby('week').agg(
+            cups=('total_cups', 'sum'),
+            revenue=('total_revenue', 'sum')
+        ).reset_index()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            fig_cups = px.bar(weekly_summary, x='week', y='cups', title='Total Cups per Week', labels={'cups': 'Cups Sold', 'week': 'Week'}, text_auto=True)
+            st.plotly_chart(fig_cups, use_container_width=True)
+        with col2:
+            fig_revenue = px.bar(weekly_summary, x='week', y='revenue', title='Total Revenue per Week', labels={'revenue': 'Total Revenue (Rp)', 'week': 'Week'}, text_auto=True)
+            fig_revenue.update_traces(texttemplate='Rp%{y:,.0f}', textposition='outside')
+            fig_revenue.update_yaxes(title_text='Total Revenue (Rp)')
+            st.plotly_chart(fig_revenue, use_container_width=True)
+
+        # --- Grafik 3 & 4: Dibuat dari tabel agregat kecil ---
+        st.subheader("📅 Productivity by Day")
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         
-    st.subheader("📈 Week-on-Week Productivity")
-    if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
-        if not filtered_df.empty:
-            df_chart_cups = filtered_df.groupby('week')['cups'].sum().reset_index()
-            df_chart_revenue = filtered_df.groupby('week')['revenue'].sum().reset_index()
-            col1, col2 = st.columns(2)
-            with col1:
-                fig_cups = px.bar(df_chart_cups, x='week', y='cups', title='Total Cups per Week', labels={'cups': 'Cups Sold', 'week': 'Week'}, text_auto=True)
-                st.plotly_chart(fig_cups, use_container_width=True)
-            with col2:
-                fig_revenue = px.bar(df_chart_revenue, x='week', y='revenue', title='Total Revenue per Week', labels={'revenue': 'Total Revenue (Rp)', 'week': 'Week'}, text_auto=True)
-                fig_revenue.update_traces(texttemplate='Rp%{y:,.0f}', textposition='outside')
-                fig_revenue.update_yaxes(title_text='Total Revenue (Rp)')
-                st.plotly_chart(fig_revenue, use_container_width=True)
-        else:
-            st.info("No data available for Week-on-Week Productivity based on current filters.")
-    else:
-        st.warning("Column 'week', 'cups', or 'revenue' is not available for charting.")
+        total_cups_day = agg_data.groupby('day')['total_cups'].sum().reset_index()
+        avg_sellers_day = agg_data.groupby('day')['unique_riders'].mean().round(0).astype(int).reset_index(name='avg_sellers')
         
-    st.subheader("📅 Productivity by Day")
-    if 'day' in filtered_df.columns and 'cups' in filtered_df.columns and 'ridername' in filtered_df.columns:
-        if not filtered_df.empty:
-            df_day = filtered_df.copy()
-            daily_stats = df_day.groupby(['day', 'date']).agg(total_cups=('cups', 'sum'), unique_riders=('ridername', 'nunique')).reset_index()
-            avg_sellers_day = daily_stats.groupby('day')['unique_riders'].mean().round(0).astype(int).reset_index(name='avg_sellers')
-            total_cups_day = daily_stats.groupby('day')['total_cups'].sum().reset_index(name='total_cups')
-            daily_stats['productivity'] = daily_stats.apply(lambda row: row['total_cups'] / row['unique_riders'] if row['unique_riders'] > 0 else 0, axis=1)
-            avg_productivity_day = daily_stats.groupby('day')['productivity'].mean().round(0).astype(int).reset_index(name='avg_productivity')
-            summary = total_cups_day.merge(avg_sellers_day, on='day').merge(avg_productivity_day, on='day')
-            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            summary['day'] = pd.Categorical(summary['day'], categories=day_order, ordered=True)
-            summary = summary.sort_values('day')
-            st.dataframe(summary.rename(columns={'day': 'Day','total_cups': 'Total Cups','avg_sellers': 'Avg. Sellers','avg_productivity': 'Avg. Cups Sold Per Day'}), use_container_width=True, hide_index=True)
-            pie_fig = px.pie(summary, names='day', values='total_cups', title='Cups Sold by Day', category_orders={'day': day_order})
-            st.plotly_chart(pie_fig, use_container_width=True)
-        else:
-            st.info("No data available for Productivity by Day based on current filters.")
+        agg_data['productivity'] = agg_data.apply(lambda row: row['total_cups'] / row['unique_riders'] if row['unique_riders'] > 0 else 0, axis=1)
+        avg_productivity_day = agg_data.groupby('day')['productivity'].mean().round(0).astype(int).reset_index(name='avg_productivity')
+        
+        day_summary = pd.merge(total_cups_day, avg_sellers_day, on='day').merge(avg_productivity_day, on='day')
+        day_summary['day'] = pd.Categorical(day_summary['day'], categories=day_order, ordered=True)
+        day_summary = day_summary.sort_values('day')
+
+        st.dataframe(day_summary.rename(columns={'day': 'Day','total_cups': 'Total Cups','avg_sellers': 'Avg. Sellers','avg_productivity': 'Avg. Cups Sold Per Day'}), use_container_width=True, hide_index=True)
+        pie_fig = px.pie(day_summary, names='day', values='total_cups', title='Cups Sold by Day', category_orders={'day': day_order})
+        st.plotly_chart(pie_fig, use_container_width=True)
     else:
-        st.warning("Column 'day', 'ridername', or 'cups' is not available.")
+        # Jika filtered_df kosong, tampilkan info di bagian grafik juga
+        st.subheader("📈 Week-on-Week Productivity")
+        st.info("No data available for Week-on-Week Productivity based on current filters.")
+        st.subheader("📅 Productivity by Day")
+        st.info("No data available for Productivity by Day based on current filters.")
+
 
 # =====================================================================================
-# SISA KODE (KARTU 2 DAN 3) TIDAK DIUBAH SAMA SEKALI
+# KODE UNTUK KARTU 2 DAN 3 DI BAWAH INI TIDAK DIUBAH SAMA SEKALI
 # =====================================================================================
 
 def display_grup_2():
