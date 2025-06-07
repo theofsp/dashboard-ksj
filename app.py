@@ -140,11 +140,11 @@ def display_grup_2():
     st.subheader("Business Summary")
     total_ksj_revenue = df['selling'].sum()
     total_blitz_revenue = df['revenue'].sum()
-    total_cups_sold = df['cups'].sum() # Menambahkan Total Product Sold
-    col1, col2, col3 = st.columns(3) # Mengubah menjadi 3 kolom
+    total_cups_sold = df['cups'].sum() 
+    col1, col2, col3 = st.columns(3)
     col1.metric("Total Client's Revenue (KSJ)", f"Rp {total_ksj_revenue:,.0f}")
     col2.metric("Total Blitz's Revenue", f"Rp {total_blitz_revenue:,.0f}")
-    col3.metric("Total Product Sold", f"{total_cups_sold:,}") # Menampilkan Total Product Sold
+    col3.metric("Total Product Sold", f"{total_cups_sold:,}")
     st.markdown("---")
 
     st.subheader("Business Position")
@@ -152,26 +152,47 @@ def display_grup_2():
     previous_month_period = latest_month_period - 1
     cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum()
     cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum()
-
-    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum() # Menambahkan Total Blitz's Revenue
-    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum() # Menambahkan Total Blitz's Revenue
+    
+    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum()
+    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum()
 
     latest_week = df['week'].max()
     previous_week = latest_week - 1
     cups_latest_week = df[df['week'] == latest_week]['cups'].sum()
     cups_previous_week = df[df['week'] == previous_week]['cups'].sum()
 
-    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum() # Menambahkan Total Blitz's Revenue
-    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum() # Menambahkan Total Blitz's Revenue
+    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum()
+    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum()
+
+    # Calculate differences for delta
+    delta_cups_month = cups_latest_month - cups_previous_month
+    delta_cups_week = cups_latest_week - cups_previous_week
+    delta_revenue_month = revenue_latest_month - revenue_previous_month
+    delta_revenue_week = revenue_latest_week - revenue_previous_week
 
     col1, col2 = st.columns(2)
-    col1.metric(f"Product Sold ({latest_month_period})", f"{cups_latest_month:,}", f"{cups_latest_month - cups_previous_month:,} vs Prv. Month")
-    col2.metric(f"Product Sold (Week {latest_week})", f"{cups_latest_week:,}", f"{cups_latest_week - cups_previous_week:,} vs Prv. Week")
+    col1.metric(
+        f"Product Sold ({latest_month_period})",
+        f"{cups_latest_month:,}",
+        f"{delta_cups_month:,.0f} vs Prv. Month" # Delta value, default color (green for positive, red for negative)
+    )
+    col2.metric(
+        f"Product Sold (Week {latest_week})",
+        f"{cups_latest_week:,}",
+        f"{delta_cups_week:,.0f} vs Prv. Week" # Delta value, default color
+    )
     
-    # Menambahkan baris untuk Total Blitz's Revenue
     col3, col4 = st.columns(2)
-    col3.metric(f"Blitz's Revenue ({latest_month_period})", f"Rp {revenue_latest_month:,.0f}", f"Rp {revenue_latest_month - revenue_previous_month:,.0f} vs Prv. Month")
-    col4.metric(f"Blitz's Revenue (Week {latest_week})", f"Rp {revenue_latest_week:,.0f}", f"Rp {revenue_latest_week - revenue_previous_week:,.0f} vs Prv. Week")
+    col3.metric(
+        f"Blitz's Revenue ({latest_month_period})",
+        f"Rp {revenue_latest_month:,.0f}",
+        f"Rp {delta_revenue_month:,.0f} vs Prv. Month" # Delta value, default color (green for positive, red for negative)
+    )
+    col4.metric(
+        f"Blitz's Revenue (Week {latest_week})",
+        f"Rp {revenue_latest_week:,.0f}",
+        f"Rp {delta_revenue_week:,.0f} vs Prv. Week" # Delta value, default color
+    )
     
     st.markdown("---")
     st.subheader("Seller Retention Analysis")
