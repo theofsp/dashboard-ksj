@@ -66,54 +66,63 @@ def display_main_menu():
             st.button("Open Report", on_click=set_view, args=['area_analysis'], key="area_button", use_container_width=True)
 
 def display_grup_1():
-    # KODE DI BAGIAN INI DIKEMBALIKAN KE VERSI ASLI ANDA SEBELUMNYA DAN DIPASTIKAN LOGIKANYA
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
     st.markdown("---")
     df = st.session_state["main_df"]
     st.subheader("📄 All Data")
     
-    # Inisialisasi filtered_df dengan df penuh sebelum filter
-    filtered_df_for_display = df.copy() 
+    # Inisialisasi session state untuk filter jika belum ada
+    if 'grup1_filters' not in st.session_state:
+        st.session_state['grup1_filters'] = {}
+        # Populate initial filter states based on unique values
+        for col in df.columns:
+            if df[col].dtype != 'datetime64[ns]':
+                unique_vals = df[col].dropna().unique()
+                if len(unique_vals) < 100:
+                    st.session_state['grup1_filters'][col] = sorted(unique_vals) # Default to all selected
+
+    # Inisialisasi session state untuk tampilan dataframe jika belum ada
+    if 'grup1_show_data' not in st.session_state:
+        st.session_state['grup1_show_data'] = False # Default: Data tidak ditampilkan
 
     with st.expander("🔎 Filter"):
-        # Dictionary untuk menyimpan pilihan filter
-        selected_filters = {}
         for col in df.columns:
             if df[col].dtype != 'datetime64[ns]':
                 unique_vals = df[col].dropna().unique()
                 if len(unique_vals) < 100:
                     default_vals = sorted(unique_vals)
-                    # Use a unique key for each checkbox
-                    select_all_key = f"all_filter_{col}" 
-                    select_all = st.checkbox(f"Select All {col.title()}", value=True, key=select_all_key)
+                    select_all_key = f"all_filter_{col}"
                     
+                    # Set default value for checkbox based on current multiselect state
+                    is_all_selected = (len(st.session_state['grup1_filters'].get(col, [])) == len(default_vals))
+
+                    select_all = st.checkbox(f"Select All {col.title()}", value=is_all_selected, key=select_all_key)
+                    
+                    # Update selected_vals based on checkbox
                     if select_all:
                         current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=default_vals, key=f"multiselect_{col}")
                     else:
-                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=[], key=f"multiselect_{col}")
+                        current_selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=st.session_state['grup1_filters'].get(col, []), key=f"multiselect_{col}")
                     
-                    selected_filters[col] = current_selected_vals
+                    # Update session state with current selections
+                    st.session_state['grup1_filters'][col] = current_selected_vals
     
-    # Terapkan filter ke filtered_df_for_display berdasarkan pilihan di expander
-    # Penting: filter ini hanya diaplikasikan saat tombol "Show Data" ditekan
-    # Jadi, logika filter seharusnya ada di dalam blok if st.button("Show Data")
-    # Atau, kita simpan filtered_df_for_display di session_state
-    
-    # Untuk memastikan filtered_df selalu mencerminkan pilihan filter terbaru
-    # dan ditampilkan saat tombol diklik.
-    # Kita akan menyimpan pilihan filter dan aplikasikannya saat tombol Show Data diklik.
-    
-    # Logic to apply filters before showing data when button is clicked
+    # Handle the "Show Data" button click
     if st.button("🔄 Show Data"):
-        temp_df = df.copy() # Mulai dengan dataframe penuh
-        for col, vals in selected_filters.items():
-            if vals: # Hanya filter jika ada nilai yang dipilih
+        st.session_state['grup1_show_data'] = True # Set flag to true to display data
+    
+    # Display data if the flag is true
+    if st.session_state['grup1_show_data']:
+        temp_df = df.copy() # Start with full dataframe
+        # Apply filters from session state
+        for col, vals in st.session_state['grup1_filters'].items():
+            if vals: # Only filter if there are values selected for this column
                 temp_df = temp_df[temp_df[col].isin(vals)]
-            else: # Jika tidak ada yang dipilih, anggap filter ini mengosongkan data untuk kolom tersebut
-                temp_df = pd.DataFrame(columns=temp_df.columns) # Atau biarkan data kosong
-                break # Jika ada kolom yang tidak dipilih, artinya tidak ada data yang akan ditampilkan
-
+            else: # If no values selected for a column, result should be empty for that filter
+                temp_df = pd.DataFrame(columns=temp_df.columns) # Effectively empty the DataFrame
+                break # No need to check other filters, result is already empty
+        
         if not temp_df.empty:
             styled_df = temp_df.copy()
             if 'date' in styled_df.columns:
@@ -127,19 +136,9 @@ def display_grup_1():
             st.info("No data to display after applying filters.")
             
     st.subheader("📈 Week-on-Week Productivity")
-    # Bagian grafik ini juga harus menggunakan filtered_df_for_display yang sudah difilter
-    # Untuk konsistensi, grafik juga harus merefleksikan filter yang diaplikasikan
-    # Cara terbaik adalah filter diaplikasikan ke st.session_state['filtered_df'] saat tombol ditekan
-    # Namun, karena kita tidak mengubah struktur utama, kita akan asumsikan filtered_df_for_display
-    # digunakan oleh grafik juga (meskipun ini berarti grafik tidak otomatis update dengan filter)
-    # Untuk demo ini, grafik akan menggunakan df (data penuh) atau filtered_df dari button.
-
-    # Sesuai permintaan Anda, saya tidak mengubah bagian ini agar tidak merusak yang lain.
-    # Filter yang diterapkan di "Show Data" button hanya berlaku untuk dataframe di atasnya.
-    # Grafik di bawahnya akan menggunakan df asli atau filtered_df dari sesi sebelumnya
-    # jika ada state management. Untuk saat ini, saya asumsikan mereka menggunakan df.
-    # Jika ingin grafik mengikuti filter, perlu refactor.
-    
+    # Bagian grafik ini tidak menggunakan filtered_df_for_display dari tombol Show Data.
+    # Mereka menggunakan df (data penuh) karena memang tidak ada state management untuk filter di grafik ini.
+    # Sesuai permintaan Anda, saya tidak mengubah bagian ini.
     if 'week' in df.columns and 'cups' in df.columns and 'revenue' in df.columns:
         col1, col2 = st.columns(2)
         with col1:
