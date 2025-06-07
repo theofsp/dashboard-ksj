@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np # Import numpy for NaN check
 
 # --- INITIAL SETUP & FUNCTIONS ---
 st.set_page_config(page_title="KSJ Data 2025", layout="wide")
@@ -35,7 +36,8 @@ def load_and_process_main_data():
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
         df['day'] = df['date'].dt.day_name()
     if 'week' not in df.columns and 'date' in df.columns:
-        df['week'] = df['date'].dt.isocalendar().week
+        # Calculate week based on date if 'week' column doesn't exist
+        df['week'] = df['date'].dt.isocalendar().week.astype(int) 
     numeric_cols = ['selling', 'revenue', 'cups']
     for col in numeric_cols:
         if col in df.columns:
@@ -156,58 +158,84 @@ def display_grup_2():
     latest_month_period = df['date'].dt.to_period('M').max()
     previous_month_period = latest_month_period - 1
     
-    # Safely get values, defaulting to 0 if no data for period
-    cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum() if not df[df['date'].dt.to_period('M') == latest_month_period].empty else 0
-    cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum() if not df[df['date'].dt.to_period('M') == previous_month_period].empty else 0
-    
-    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum() if not df[df['date'].dt.to_period('M') == latest_month_period].empty else 0
-    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum() if not df[df['date'].dt.to_period('M') == previous_month_period].empty else 0
+    # Safely get values, defaulting to 0 if no data for period, and converting to int
+    cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum()
+    cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum()
+
+    # Check for NaN and convert to 0 for delta calculation
+    cups_latest_month = cups_latest_month if pd.notnull(cups_latest_month) else 0
+    cups_previous_month = cups_previous_month if pd.notnull(cups_previous_month) else 0
+
+    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum()
+    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum()
+
+    # Check for NaN and convert to 0 for delta calculation
+    revenue_latest_month = revenue_latest_month if pd.notnull(revenue_latest_month) else 0
+    revenue_previous_month = revenue_previous_month if pd.notnull(revenue_previous_month) else 0
 
     latest_week = df['week'].max()
     previous_week = latest_week - 1
     
-    cups_latest_week = df[df['week'] == latest_week]['cups'].sum() if not df[df['week'] == latest_week].empty else 0
-    cups_previous_week = df[df['week'] == previous_week]['cups'].sum() if not df[df['week'] == previous_week].empty else 0
+    cups_latest_week = df[df['week'] == latest_week]['cups'].sum()
+    cups_previous_week = df[df['week'] == previous_week]['cups'].sum()
 
-    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum() if not df[df['week'] == latest_week].empty else 0
-    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum() if not df[df['week'] == previous_week].empty else 0
+    # Check for NaN and convert to 0 for delta calculation
+    cups_latest_week = cups_latest_week if pd.notnull(cups_latest_week) else 0
+    cups_previous_week = cups_previous_week if pd.notnull(cups_previous_week) else 0
+
+    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum()
+    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum()
+
+    # Check for NaN and convert to 0 for delta calculation
+    revenue_latest_week = revenue_latest_week if pd.notnull(revenue_latest_week) else 0
+    revenue_previous_week = revenue_previous_week if pd.notnull(revenue_previous_week) else 0
 
     # Calculate differences for delta
-    delta_cups_month = cups_latest_month - cups_previous_month
-    delta_cups_week = cups_latest_week - cups_previous_week
-    delta_revenue_month = revenue_latest_month - revenue_previous_month
-    delta_revenue_week = revenue_latest_week - revenue_previous_week
+    delta_cups_month = int(cups_latest_month - cups_previous_month) # Ensure int for delta
+    delta_cups_week = int(cups_latest_week - cups_previous_week)     # Ensure int for delta
+    delta_revenue_month = int(revenue_latest_month - revenue_previous_month) # Ensure int for delta
+    delta_revenue_week = int(revenue_latest_week - revenue_previous_week)     # Ensure int for delta
 
     col1, col2 = st.columns(2)
+    
     # Product Sold (Month)
     col1.metric(
         label=f"Product Sold ({latest_month_period})",
         value=f"{cups_latest_month:,}",
-        delta=delta_cups_month # Pass numeric delta value
+        delta=delta_cups_month, # Pass numeric delta value
+        delta_color="normal" # Explicitly set to 'normal' (green for positive, red for negative)
     )
     # Product Sold (Week)
     col2.metric(
         label=f"Product Sold (Week {latest_week})",
         value=f"{cups_latest_week:,}",
-        delta=delta_cups_week # Pass numeric delta value
+        delta=delta_cups_week, # Pass numeric delta value
+        delta_color="normal" # Explicitly set to 'normal'
     )
     
     col3, col4 = st.columns(2)
-    # Blitz's Revenue (Month)
+    # Blitz's Revenue (Month) - Manual coloring for delta
+    # Use st.markdown for the delta to control color and format precisely
+    delta_revenue_month_formatted = f"Rp {delta_revenue_month:,.0f} vs Prv. Month".replace(",", ".")
+    color_month = "red" if delta_revenue_month < 0 else "green"
+    
+    # Display the metric, then the colored delta below it manually
     col3.metric(
         label=f"Blitz's Revenue ({latest_month_period})",
-        value=f"Rp {revenue_latest_month:,.0f}",
-        delta=f"Rp {delta_revenue_month:,.0f} vs Prv. Month", # Streamlit will attempt to parse this, for explicit color
-        delta_color="normal" # "normal" means green for positive, red for negative
+        value=f"Rp {revenue_latest_month:,.0f}".replace(",", ".")
     )
-    # Blitz's Revenue (Week)
+    col3.markdown(f"<span style='color:{color_month}; font-size: 0.8em;'>{'⬇️' if delta_revenue_month < 0 else '⬆️'} {delta_revenue_month_formatted}</span>", unsafe_allow_html=True)
+
+    # Blitz's Revenue (Week) - Manual coloring for delta
+    delta_revenue_week_formatted = f"Rp {delta_revenue_week:,.0f} vs Prv. Week".replace(",", ".")
+    color_week = "red" if delta_revenue_week < 0 else "green"
+
     col4.metric(
         label=f"Blitz's Revenue (Week {latest_week})",
-        value=f"Rp {revenue_latest_week:,.0f}",
-        delta=f"Rp {delta_revenue_week:,.0f} vs Prv. Week", # For explicit color
-        delta_color="normal" # "normal" means green for positive, red for negative
+        value=f"Rp {revenue_latest_week:,.0f}".replace(",", ".")
     )
-    
+    col4.markdown(f"<span style='color:{color_week}; font-size: 0.8em;'>{'⬇️' if delta_revenue_week < 0 else '⬆️'} {delta_revenue_week_formatted}</span>", unsafe_allow_html=True)
+
     st.markdown("---")
     st.subheader("Seller Retention Analysis")
     @st.cache_data
