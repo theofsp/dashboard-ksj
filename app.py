@@ -64,7 +64,6 @@ def display_main_menu():
             st.button("Open Report", on_click=set_view, args=['area_analysis'], key="area_button", use_container_width=True)
 
 def display_grup_1():
-    # KODE DI BAGIAN INI TIDAK DIUBAH SAMA SEKALI
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
     st.markdown("---")
@@ -82,16 +81,27 @@ def display_grup_1():
                         selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=default_vals, key=col)
                     else:
                         selected_vals = st.multiselect(f"Filter {col.title()}", options=default_vals, default=[], key=col)
-                    filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
+                    
+                    # Apply filter if values are selected
+                    if selected_vals: # Make sure selected_vals is not empty
+                        filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
+                    else: # If nothing is selected, effectively filter out everything for that column
+                        filtered_df = filtered_df[filtered_df[col].isin([])] 
+                
     if st.button("🔄 Show Data"):
-        styled_df = filtered_df.copy()
-        if 'date' in styled_df.columns:
-             styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
-        for col in ['selling', 'revenue']:
-            if col in styled_df.columns:
-                styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
-        styled_df.columns = [col.title() for col in styled_df.columns]
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        # This block was the issue, ensuring it's always executed correctly when button is pressed
+        if not filtered_df.empty: # Add a check if filtered_df is not empty
+            styled_df = filtered_df.copy()
+            if 'date' in styled_df.columns:
+                styled_df['date'] = styled_df['date'].dt.strftime('%d/%m/%Y')
+            for col in ['selling', 'revenue']:
+                if col in styled_df.columns:
+                    styled_df[col] = styled_df[col].apply(lambda x: f"Rp {x:,.0f}".replace(",", ".") if pd.notnull(x) else "-")
+            styled_df.columns = [col.title() for col in styled_df.columns]
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No data to display after applying filters.")
+
     st.subheader("📈 Week-on-Week Productivity")
     if 'week' in filtered_df.columns and 'cups' in filtered_df.columns and 'revenue' in filtered_df.columns:
         col1, col2 = st.columns(2)
@@ -174,24 +184,24 @@ def display_grup_2():
     col1.metric(
         f"Product Sold ({latest_month_period})",
         f"{cups_latest_month:,}",
-        f"{delta_cups_month:,.0f} vs Prv. Month" # Delta value, default color (green for positive, red for negative)
+        f"{delta_cups_month:,.0f} vs Prv. Month" 
     )
     col2.metric(
         f"Product Sold (Week {latest_week})",
         f"{cups_latest_week:,}",
-        f"{delta_cups_week:,.0f} vs Prv. Week" # Delta value, default color
+        f"{delta_cups_week:,.0f} vs Prv. Week" 
     )
     
     col3, col4 = st.columns(2)
     col3.metric(
         f"Blitz's Revenue ({latest_month_period})",
         f"Rp {revenue_latest_month:,.0f}",
-        f"Rp {delta_revenue_month:,.0f} vs Prv. Month" # Delta value, default color (green for positive, red for negative)
+        f"Rp {delta_revenue_month:,.0f} vs Prv. Month"
     )
     col4.metric(
         f"Blitz's Revenue (Week {latest_week})",
         f"Rp {revenue_latest_week:,.0f}",
-        f"Rp {delta_revenue_week:,.0f} vs Prv. Week" # Delta value, default color
+        f"Rp {delta_revenue_week:,.0f} vs Prv. Week"
     )
     
     st.markdown("---")
