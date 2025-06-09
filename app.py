@@ -344,11 +344,12 @@ def display_area_analysis():
         return
     st.markdown("---")
     st.header("📍 Area & Outlet Analysis")
+
     df = st.session_state["main_df"]
     
     area_cols = ['area', 'city', 'district', 'outlet']
     if not all(col in df.columns for col in area_cols):
-        st.error("Data 'Area', 'City', 'District', or 'Outlet' not found.")
+        st.error("Data 'Area', 'City', 'District', or 'Outlet' not found in the main data file.")
         return
 
     st.subheader("Time & Location Filters")
@@ -407,16 +408,16 @@ def display_area_analysis():
     kpi_cols[2].metric("Total Active Sellers", f"{active_sellers:,}")
     st.markdown("---")
     
-st.subheader("Performance Breakdown")
+    st.subheader("Performance Breakdown")
+    # --- BARIS INI YANG DIPERBAIKI INDENTASINYA ---
     chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet', 'cups': 'Cups Sold'}
+    
     col_revenue_chart, col_cups_chart = st.columns(2)
 
     with col_revenue_chart:
-        # Menentukan data dan judul berdasarkan level filter
         if selected_outlet != 'All Outlets':
-            title = f"Weekly Revenue for {selected_outlet}"
             data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
-            fig = px.line(data_to_plot, x='week', y='revenue', title=title, markers=True, labels=chart_labels, text='revenue')
+            fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels, text='revenue')
             fig.update_traces(texttemplate='<b>Rp %{text:,.0f}</b>', textposition='top_center')
         else:
             if selected_district != 'All Districts':
@@ -439,52 +440,56 @@ st.subheader("Performance Breakdown")
         st.plotly_chart(fig, use_container_width=True)
 
     with col_cups_chart:
-        # Grafik untuk cups tidak diubah karena tidak memerlukan format Rupiah
         if selected_outlet != 'All Outlets':
             data_to_plot = df_filtered.groupby('week')['cups'].sum().reset_index()
             fig_cups = px.line(data_to_plot, x='week', y='cups', title=f"Weekly Cups Sold for {selected_outlet}", markers=True, labels=chart_labels)
-        elif selected_district != 'All Districts':
-            data_to_plot = df_filtered.groupby('outlet')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot, x='outlet', y='cups', title=f"Cups Sold by Outlet in {selected_district}", labels=chart_labels, text_auto=True)
-        elif selected_city != 'All Cities':
-            data_to_plot = df_filtered.groupby('district')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot, x='district', y='cups', title=f"Cups Sold by District in {selected_city}", labels=chart_labels, text_auto=True)
-        elif selected_area != 'All Areas':
-            data_to_plot = df_filtered.groupby('city')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot, x='city', y='cups', title=f"Cups Sold by City in {selected_area}", labels=chart_labels, text_auto=True)
         else:
-            data_to_plot = df_filtered.groupby('area')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig_cups = px.bar(data_to_plot, x='area', y='cups', title="Overall Cups Sold by Area", labels=chart_labels, text_auto=True)
+            if selected_district != 'All Districts':
+                level, group_col = 'Outlet', 'outlet'
+                title = f"Cups Sold by Outlet in {selected_district}"
+            elif selected_city != 'All Cities':
+                level, group_col = 'District', 'district'
+                title = f"Cups Sold by District in {selected_city}"
+            elif selected_area != 'All Areas':
+                level, group_col = 'City', 'city'
+                title = f"Cups Sold by City in {selected_area}"
+            else:
+                level, group_col = 'Area', 'area'
+                title = "Overall Cups Sold by Area"
+
+            data_to_plot = df_filtered.groupby(group_col)['cups'].sum().reset_index().sort_values('cups', ascending=False)
+            fig_cups = px.bar(data_to_plot, x=group_col, y='cups', title=title, labels=chart_labels, text_auto=True)
         st.plotly_chart(fig_cups, use_container_width=True)
-    
+
     st.markdown("---")
     st.subheader("District Productivity Ranking")
-    district_summary = df_filtered.groupby('district').agg(total_revenue=('revenue', 'sum'),total_cups=('cups', 'sum')).reset_index()
-    if not district_summary.empty:
-        rank_labels={'total_revenue': 'Total Revenue', 'total_cups': 'Total Cups', 'district': 'District'}
-        st.markdown("#### Highest Productivity Districts")
-        col_high_rev, col_high_cups = st.columns(2)
-        with col_high_rev:
-            top_10_revenue = district_summary.nlargest(10, 'total_revenue')
-            fig_top_rev = px.bar(top_10_revenue.sort_values('total_revenue'), x='total_revenue', y='district', orientation='h', title="Top 10 by Blitz's Revenue", text_auto=True, labels=rank_labels)
-            fig_top_rev.update_traces(texttemplate='Rp%{x:,.0f}')
-            st.plotly_chart(fig_top_rev, use_container_width=True)
-        with col_high_cups:
-            top_10_cups = district_summary.nlargest(10, 'total_cups')
-            fig_top_cups = px.bar(top_10_cups.sort_values('total_cups'), x='total_cups', y='district', orientation='h', title="Top 10 by Product Sold", text_auto=True, labels=rank_labels)
-            st.plotly_chart(fig_top_cups, use_container_width=True)
-            
-        st.markdown("#### Lowest Productivity Districts")
-        col_low_rev, col_low_cups = st.columns(2)
-        with col_low_rev:
-            bottom_10_revenue = district_summary.nsmallest(10, 'total_revenue')
-            fig_low_rev = px.bar(bottom_10_revenue.sort_values('total_revenue', ascending=False), x='total_revenue', y='district', orientation='h', title="Bottom 10 by Blitz's Revenue", text_auto=True, labels=rank_labels)
-            fig_low_rev.update_traces(texttemplate='Rp%{x:,.0f}')
-            st.plotly_chart(fig_low_rev, use_container_width=True)
-        with col_low_cups:
-            bottom_10_cups = district_summary.nsmallest(10, 'total_cups')
-            fig_low_cups = px.bar(bottom_10_cups.sort_values('total_cups', ascending=False), x='total_cups', y='district', orientation='h', title="Bottom 10 by Product Sold", text_auto=True, labels=rank_labels)
-            st.plotly_chart(fig_low_cups, use_container_width=True)
+    if not df_filtered.empty:
+        district_summary = df_filtered.groupby('district').agg(total_revenue=('revenue', 'sum'),total_cups=('cups', 'sum')).reset_index()
+        if not district_summary.empty:
+            rank_labels={'total_revenue': 'Total Revenue', 'total_cups': 'Total Cups', 'district': 'District'}
+            st.markdown("#### Highest Productivity Districts")
+            col_high_rev, col_high_cups = st.columns(2)
+            with col_high_rev:
+                top_10_revenue = district_summary.nlargest(10, 'total_revenue')
+                fig_top_rev = px.bar(top_10_revenue.sort_values('total_revenue'), x='total_revenue', y='district', orientation='h', title="Top 10 by Blitz's Revenue", text_auto=True, labels=rank_labels)
+                fig_top_rev.update_traces(texttemplate='Rp%{x:,.0f}')
+                st.plotly_chart(fig_top_rev, use_container_width=True)
+            with col_high_cups:
+                top_10_cups = district_summary.nlargest(10, 'total_cups')
+                fig_top_cups = px.bar(top_10_cups.sort_values('total_cups'), x='total_cups', y='district', orientation='h', title="Top 10 by Product Sold", text_auto=True, labels=rank_labels)
+                st.plotly_chart(fig_top_cups, use_container_width=True)
+                
+            st.markdown("#### Lowest Productivity Districts")
+            col_low_rev, col_low_cups = st.columns(2)
+            with col_low_rev:
+                bottom_10_revenue = district_summary.nsmallest(10, 'total_revenue')
+                fig_low_rev = px.bar(bottom_10_revenue.sort_values('total_revenue', ascending=False), x='total_revenue', y='district', orientation='h', title="Bottom 10 by Blitz's Revenue", text_auto=True, labels=rank_labels)
+                fig_low_rev.update_traces(texttemplate='Rp%{x:,.0f}')
+                st.plotly_chart(fig_low_rev, use_container_width=True)
+            with col_low_cups:
+                bottom_10_cups = district_summary.nsmallest(10, 'total_cups')
+                fig_low_cups = px.bar(bottom_10_cups.sort_values('total_cups', ascending=False), x='total_cups', y='district', orientation='h', title="Bottom 10 by Product Sold", text_auto=True, labels=rank_labels)
+                st.plotly_chart(fig_low_cups, use_container_width=True)
 
     st.markdown("---")
     st.subheader("Outlet Supply vs. Demand Analysis")
@@ -500,9 +505,22 @@ st.subheader("Performance Breakdown")
         final_sd_df = supply_demand_summary[supply_demand_summary['status'].isin(selected_statuses)] if selected_statuses else supply_demand_summary
 
         if not final_sd_df.empty:
-            st.dataframe(final_sd_df.rename(columns={'outlet': 'Outlet', 'demand': 'Avg Daily Demand', 'supply': 'Sellers', 'ratio': 'Ratio', 'status': 'Status'}), use_container_width=True, hide_index=True, column_config={"Avg Daily Demand": st.column_config.NumberColumn(format="%.2f"), "Ratio": st.column_config.NumberColumn(format="%.4f")})
-            st.download_button(label="📥 Export Supply vs Demand to Excel", data=to_excel(final_sd_df), file_name="outlet_supply_demand_analysis.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            fig_sd = px.scatter(final_sd_df, x="demand", y="supply", hover_name="outlet", color="status", title="Supply (Sellers) vs. Average Daily Demand (Cups) per Outlet", labels={"demand": "Average Daily Demand (Cups)", "supply": "Total Unique Sellers", "status": "Status"})
+            st.dataframe(
+                final_sd_df.rename(columns={'outlet': 'Outlet', 'demand': 'Avg Daily Demand', 'supply': 'Sellers', 'ratio': 'Ratio', 'status': 'Status'}),
+                use_container_width=True, hide_index=True,
+                column_config={"Avg Daily Demand": st.column_config.NumberColumn(format="%.2f"), "Ratio": st.column_config.NumberColumn(format="%.4f")}
+            )
+            st.download_button(
+                label="📥 Export Supply vs Demand to Excel",
+                data=to_excel(final_sd_df),
+                file_name="outlet_supply_demand_analysis.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            fig_sd = px.scatter(
+                final_sd_df, x="demand", y="supply", hover_name="outlet", color="status",
+                title="Supply (Sellers) vs. Average Daily Demand (Cups) per Outlet",
+                labels={"demand": "Average Daily Demand (Cups)", "supply": "Total Unique Sellers", "status": "Status"}
+            )
             fig_sd.update_yaxes(range=[0, 150])
             max_val = max(final_sd_df['demand'].max(), final_sd_df['supply'].max()) if not final_sd_df.empty else 1
             fig_sd.add_shape(type='line', x0=0, y0=0, x1=max_val, y1=max_val, line=dict(color='Gray', dash='dash'))
