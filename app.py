@@ -218,9 +218,42 @@ def display_grup_2():
     st.markdown("---")
     st.header("🗓️ Business Dashboard")
     df = st.session_state["main_df"]
+
+    # --- PENAMBAHAN FILTER GEOGRAFIS BERJENJANG ---
+    st.subheader("Geographic Filters")
+    
+    filter_cols = st.columns(3)
+    with filter_cols[0]:
+        area_list = ['All Areas'] + sorted(df['area'].unique().tolist())
+        selected_area = st.selectbox("Select Area", area_list, key="grup2_area")
+    
+    # Filter data berdasarkan pilihan area
+    df_filtered_area = df[df['area'] == selected_area] if selected_area != 'All Areas' else df
+
+    with filter_cols[1]:
+        city_list = ['All Cities'] + sorted(df_filtered_area['city'].unique().tolist())
+        selected_city = st.selectbox("Select City", city_list, key="grup2_city")
+
+    # Filter data lebih lanjut
+    df_filtered_city = df_filtered_area[df_filtered_area['city'] == selected_city] if selected_city != 'All Cities' else df_filtered_area
+    
+    with filter_cols[2]:
+        district_list = ['All Districts'] + sorted(df_filtered_city['district'].unique().tolist())
+        selected_district = st.selectbox("Select District", district_list, key="grup2_district")
+
+    # Ini adalah DataFrame final yang akan digunakan oleh semua modul di bawah
+    filtered_df = df_filtered_city[df_filtered_city['district'] == selected_district] if selected_district != 'All Districts' else df_filtered_city
+    
+    st.markdown("---")
+    
+    if filtered_df.empty:
+        st.warning("No data available for the current filter selection.")
+        return
+
+    # --- SEMUA MODUL DI BAWAH INI SEKARANG MENGGUNAKAN 'filtered_df' ---
     
     st.subheader("Weekly Performance Summary")
-    summary_df = df.groupby('week').agg(ksj_revenue=('selling', 'sum'),blitz_revenue=('revenue', 'sum'),active_sellers=('ridername', 'nunique'),total_cups=('cups', 'sum')).reset_index()
+    summary_df = filtered_df.groupby('week').agg(ksj_revenue=('selling', 'sum'),blitz_revenue=('revenue', 'sum'),active_sellers=('ridername', 'nunique'),total_cups=('cups', 'sum')).reset_index()
     display_summary_df = summary_df.rename(columns={'week': 'Week', 'ksj_revenue': "KSJ's Revenue", 'blitz_revenue': "Blitz's Revenue",'active_sellers': 'Active Sellers', 'total_cups': 'Total Cups'})
     st.dataframe(display_summary_df.style.format({"KSJ's Revenue": "Rp {:,.0f}","Blitz's Revenue": "Rp {:,.0f}"}),use_container_width=True, hide_index=True)
     st.download_button(
@@ -232,9 +265,9 @@ def display_grup_2():
     st.markdown("---")
 
     st.subheader("Business Summary")
-    total_ksj_revenue = df['selling'].sum()
-    total_blitz_revenue = df['revenue'].sum()
-    total_cups_sold = df['cups'].sum() 
+    total_ksj_revenue = filtered_df['selling'].sum()
+    total_blitz_revenue = filtered_df['revenue'].sum()
+    total_cups_sold = filtered_df['cups'].sum() 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Client's Revenue (KSJ)", f"Rp {total_ksj_revenue:,.0f}")
     col2.metric("Total Blitz's Revenue", f"Rp {total_blitz_revenue:,.0f}")
@@ -242,65 +275,37 @@ def display_grup_2():
     st.markdown("---")
 
     st.subheader("Business Position")
-    if 'date' not in df.columns or 'week' not in df.columns:
-        st.warning("Kolom 'date' atau 'week' tidak ditemukan.")
-        return 
-    
-    latest_month_period = df['date'].dt.to_period('M').max()
+    # Kalkulasi sekarang berdasarkan filtered_df
+    latest_month_period = filtered_df['date'].dt.to_period('M').max()
     previous_month_period = latest_month_period - 1
-    cups_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['cups'].sum()
-    cups_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['cups'].sum()
+    cups_latest_month = filtered_df[filtered_df['date'].dt.to_period('M') == latest_month_period]['cups'].sum()
+    cups_previous_month = filtered_df[filtered_df['date'].dt.to_period('M') == previous_month_period]['cups'].sum()
     cups_latest_month = 0 if pd.isna(cups_latest_month) else cups_latest_month
     cups_previous_month = 0 if pd.isna(cups_previous_month) else cups_previous_month
-    
-    revenue_latest_month = df[df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum()
-    revenue_previous_month = df[df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum()
+    revenue_latest_month = filtered_df[filtered_df['date'].dt.to_period('M') == latest_month_period]['revenue'].sum()
+    revenue_previous_month = filtered_df[filtered_df['date'].dt.to_period('M') == previous_month_period]['revenue'].sum()
     revenue_latest_month = 0 if pd.isna(revenue_latest_month) else revenue_latest_month
     revenue_previous_month = 0 if pd.isna(revenue_previous_month) else revenue_previous_month
-    
-    latest_week = df['week'].max()
+    latest_week = filtered_df['week'].max()
     previous_week = latest_week - 1
-    cups_latest_week = df[df['week'] == latest_week]['cups'].sum()
-    cups_previous_week = df[df['week'] == previous_week]['cups'].sum()
+    cups_latest_week = filtered_df[filtered_df['week'] == latest_week]['cups'].sum()
+    cups_previous_week = filtered_df[filtered_df['week'] == previous_week]['cups'].sum()
     cups_latest_week = 0 if pd.isna(cups_latest_week) else cups_latest_week
     cups_previous_week = 0 if pd.isna(cups_previous_week) else cups_previous_week
-    
-    revenue_latest_week = df[df['week'] == latest_week]['revenue'].sum()
-    revenue_previous_week = df[df['week'] == previous_week]['revenue'].sum()
+    revenue_latest_week = filtered_df[filtered_df['week'] == latest_week]['revenue'].sum()
+    revenue_previous_week = filtered_df[filtered_df['week'] == previous_week]['revenue'].sum()
     revenue_latest_week = 0 if pd.isna(revenue_latest_week) else revenue_latest_week
     revenue_previous_week = 0 if pd.isna(revenue_previous_week) else revenue_previous_week
-    
     delta_cups_month = int(cups_latest_month - cups_previous_month)
     delta_cups_week = int(cups_latest_week - cups_previous_week)
     delta_revenue_month = int(revenue_latest_month - revenue_previous_month)
     delta_revenue_week = int(revenue_latest_week - revenue_previous_week)
-    
-    # --- INI ADALAH SATU-SATUNYA BLOK YANG DIREVISI ---
     col1, col2 = st.columns(2)
     col3, col4 = st.columns(2)
-
-    col1.metric(
-        label=f"Product Sold ({latest_month_period})", 
-        value=f"{cups_latest_month:,}", 
-        delta=delta_cups_month
-    )
-    col2.metric(
-        label=f"Product Sold (Week {latest_week})", 
-        value=f"{cups_latest_week:,}", 
-        delta=delta_cups_week
-    )
-    col3.metric(
-        label=f"Blitz's Revenue ({latest_month_period})", 
-        value=f"Rp {revenue_latest_month:,.0f}", 
-        delta=delta_revenue_month
-    )
-    col4.metric(
-        label=f"Blitz's Revenue (Week {latest_week})", 
-        value=f"Rp {revenue_latest_week:,.0f}", 
-        delta=delta_revenue_week
-    )
-    # --- AKHIR DARI BLOK REVISI ---
-
+    col1.metric(label=f"Product Sold ({latest_month_period})", value=f"{cups_latest_month:,}", delta=delta_cups_month)
+    col2.metric(label=f"Product Sold (Week {latest_week})", value=f"{cups_latest_week:,}", delta=delta_cups_week)
+    col3.metric(label=f"Blitz's Revenue ({latest_month_period})", value=f"Rp {revenue_latest_month:,.0f}", delta=delta_revenue_month)
+    col4.metric(label=f"Blitz's Revenue (Week {latest_week})", value=f"Rp {revenue_latest_week:,.0f}", delta=delta_revenue_week)
     st.markdown("---")
 
     st.subheader("Seller Retention Analysis")
@@ -323,7 +328,8 @@ def display_grup_2():
             results.append({"Week": current_week_num, "Total Sellers": len(current_sellers), "New Sellers": len(new_sellers_set), "Retained Sellers": len(retained_sellers_set), "Churned Sellers": len(churned_sellers_set), "Retention Rate (%)": retention_rate})
         return pd.DataFrame(results)
     
-    retention_df = calculate_seller_retention(df)
+    # Analisis retensi sekarang berdasarkan filtered_df
+    retention_df = calculate_seller_retention(filtered_df)
     if retention_df is not None and not retention_df.empty:
         st.dataframe(retention_df.style.format({"Retention Rate (%)": "{:.2f}%"}), use_container_width=True, hide_index=True)
         st.download_button(
@@ -336,7 +342,7 @@ def display_grup_2():
         fig_retention.update_layout(yaxis_ticksuffix="%")
         st.plotly_chart(fig_retention, use_container_width=True)
     else:
-        st.warning("Cannot perform retention analysis.")
+        st.warning("No seller retention data to display for the current selection.")
 
 def display_area_analysis():
     if st.button("⬅️ Back to Menu"):
