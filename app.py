@@ -67,8 +67,11 @@ def load_and_process_main_data():
 def display_main_menu():
     st.header("Main Menu")
     st.markdown("Select an analysis to view from the options below.")
-    col1, col2, col3 = st.columns(3, gap="large")
-    with col1:
+    
+    # --- REVISI: Mengubah layout kembali menjadi 3 kolom ---
+    row1_col1, row1_col2, row1_col3 = st.columns(3, gap="large")
+
+    with row1_col1:
         with st.container(border=True):
             st.subheader("📊 All Data")
             st.markdown("View all raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
@@ -80,18 +83,30 @@ def display_main_menu():
                         st.session_state.grup1_filter_options[col] = sorted(df[col].dropna().unique())
                 st.session_state.grup1_selections = {col: options for col, options in st.session_state.grup1_filter_options.items()}
                 set_view('grup_1')
-    with col2:
+    
+    with row1_col2:
         with st.container(border=True):
             st.subheader("🗓️ Business Dashboard")
-            st.markdown("View a consolidated dashboard of business performance, position, and seller retention analysis.")
+            st.markdown("View a consolidated dashboard of business performance, position, and seller retention.")
             if st.button("Open Report", key="grup2_button", use_container_width=True):
                 set_view('grup_2')
-    with col3:
+
+    with row1_col3:
         with st.container(border=True):
             st.subheader("📍 Area & Outlet Analysis")
             st.markdown("Drill down into area-specific performance, with detailed location and outlet-level breakdowns.")
             if st.button("Open Report", key="area_button", use_container_width=True):
                 set_view('area_analysis')
+
+    # Baris kedua untuk kartu selanjutnya
+    row2_col1, row2_col2, row2_col3 = st.columns(3, gap="large")
+
+    with row2_col1:
+        with st.container(border=True):
+            st.subheader("💸 Payroll Management")
+            st.markdown("Manage and analyze seller payroll, deductions, and incentives (Under Development).")
+            if st.button("Open Module", key="payroll_button", use_container_width=True):
+                set_view('payroll_management')
 
 def display_grup_1():
     if st.button("⬅️ Back to Menu"):
@@ -511,6 +526,14 @@ def display_area_analysis():
         else:
             st.info("No supply/demand data available for the current filter selection.")
 
+def display_payroll_management():
+    if st.button("⬅️ Back to Menu"):
+        set_view('main_menu')
+        return
+    st.markdown("---")
+    st.header("💸 Payroll Management")
+    st.info("This module is currently under development.")
+    st.image("https://media.tenor.com/p4sS5_nB1vEAAAAC/spongebob-money.gif", width=300)
 
 # --- MAIN APPLICATION FLOW ---
 if "logged_in" not in st.session_state:
@@ -558,3 +581,6 @@ else:
         display_grup_2()
     elif current_view == "area_analysis":
         display_area_analysis()
+    # --- TAMBAHKAN BARIS INI ---
+    elif current_view == "payroll_management":
+        display_payroll_management()
