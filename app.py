@@ -339,59 +339,6 @@ def display_grup_2():
         st.warning("Cannot perform retention analysis.")
 
 def display_area_analysis():
-    # KODE DI BAGIAN INI TIDAK DIUBAH
-    if st.button("⬅️ Back to Menu"):
-        set_view('main_menu')
-        return
-    # ... (rest of the function is unchanged)
-    pass
-
-# --- MAIN APPLICATION FLOW ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    # ... (login logic is unchanged)
-    pass
-else:
-    if "main_df" not in st.session_state:
-        with st.spinner("Processing Your Data. Please wait... :)"):
-            st.session_state["main_df"] = load_and_process_main_data()
-            
-    if 'page_number' not in st.session_state:
-        st.session_state.page_number = 0
-            
-    col1, col2 = st.columns([1, 8])
-    with col1:
-        try: st.image("rideblitz_logo.jpeg", width=80)
-        except: pass
-    with col2:
-        st.title("📊 KSJ Data 2025")
-        
-    st.markdown('<script>document.title = "KSJ Data 2025";</script>', unsafe_allow_html=True)
-    
-    st.sidebar.title(f"Welcome, {st.session_state.get('username', 'User')}!")
-    if st.sidebar.button("Logout"):
-        logout()
-    st.sidebar.markdown("---")
-    
-    if "view" not in st.session_state:
-        st.session_state.view = "main_menu"
-        
-    current_view = st.session_state.get("view", "main_menu")
-
-    if current_view == "main_menu":
-        display_main_menu()
-    elif current_view == "grup_1":
-        display_grup_1()
-    elif current_view == "grup_2":
-        display_grup_2()
-    elif current_view == "area_analysis":
-        # Saya sertakan lagi kode lengkapnya agar tidak ada kebingungan
-        display_area_analysis_full()
-
-# Saya sertakan kembali kode lengkap untuk display_area_analysis_full
-def display_area_analysis_full():
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
         return
@@ -468,18 +415,23 @@ def display_area_analysis_full():
         if selected_outlet != 'All Outlets':
             data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
             fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels)
+            fig.update_traces(texttemplate='Rp%{y:,.0f}', textposition='top_center')
         elif selected_district != 'All Districts':
             data_to_plot = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='outlet', y='revenue', title=f"Revenue by Outlet in {selected_district}", labels=chart_labels)
+            fig = px.bar(data_to_plot, x='outlet', y='revenue', title=f"Revenue by Outlet in {selected_district}", labels=chart_labels, text_auto=True)
+            fig.update_traces(texttemplate='Rp%{y:,.0f}')
         elif selected_city != 'All Cities':
             data_to_plot = df_filtered.groupby('district')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='district', y='revenue', title=f"Revenue by District in {selected_city}", labels=chart_labels)
+            fig = px.bar(data_to_plot, x='district', y='revenue', title=f"Revenue by District in {selected_city}", labels=chart_labels, text_auto=True)
+            fig.update_traces(texttemplate='Rp%{y:,.0f}')
         elif selected_area != 'All Areas':
             data_to_plot = df_filtered.groupby('city')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='city', y='revenue', title=f"Revenue by City in {selected_area}", labels=chart_labels)
+            fig = px.bar(data_to_plot, x='city', y='revenue', title=f"Revenue by City in {selected_area}", labels=chart_labels, text_auto=True)
+            fig.update_traces(texttemplate='Rp%{y:,.0f}')
         else:
             data_to_plot = df_filtered.groupby('area')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='area', y='revenue', title="Overall Revenue by Area", labels=chart_labels)
+            fig = px.bar(data_to_plot, x='area', y='revenue', title="Overall Revenue by Area", labels=chart_labels, text_auto=True)
+            fig.update_traces(texttemplate='Rp%{y:,.0f}')
         st.plotly_chart(fig, use_container_width=True)
 
     with col_cups_chart:
@@ -552,3 +504,51 @@ def display_area_analysis_full():
             st.plotly_chart(fig_sd, use_container_width=True)
         else:
             st.info("No supply/demand data available for the current filter selection.")
+
+
+# --- MAIN APPLICATION FLOW ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            st.image("rideblitz_logo.jpeg", width=150)
+        except FileNotFoundError:
+            st.warning("Logo file 'rideblitz_logo.jpeg' not found.")
+        st.title("Login - KSJ Data Dashboard")
+        username_input = st.text_input("Username", placeholder="Enter your username")
+        password_input = st.text_input("Password", type="password", placeholder="Enter your password")
+        if st.button("Login", use_container_width=True):
+            check_login(username_input, password_input)
+else:
+    if "main_df" not in st.session_state:
+        with st.spinner("Processing Your Data. Please wait... :)"):
+            st.session_state["main_df"] = load_and_process_main_data()
+    if 'page_number' not in st.session_state:
+        st.session_state.page_number = 0
+    col1, col2 = st.columns([1, 8])
+    with col1:
+        try:
+            st.image("rideblitz_logo.jpeg", width=80)
+        except: pass
+    with col2:
+        st.title("📊 KSJ Data 2025")
+    st.markdown('<script>document.title = "KSJ Data 2025";</script>', unsafe_allow_html=True)
+    st.sidebar.title(f"Welcome, {st.session_state.get('username', 'User')}!")
+    if st.sidebar.button("Logout"):
+        logout()
+    st.sidebar.markdown("---")
+    if "view" not in st.session_state:
+        st.session_state.view = "main_menu"
+    current_view = st.session_state.get("view", "main_menu")
+
+    if current_view == "main_menu":
+        display_main_menu()
+    elif current_view == "grup_1":
+        display_grup_1()
+    elif current_view == "grup_2":
+        display_grup_2()
+    elif current_view == "area_analysis":
+        display_area_analysis()
