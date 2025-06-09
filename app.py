@@ -414,8 +414,8 @@ def display_area_analysis():
     with col_revenue_chart:
         if selected_outlet != 'All Outlets':
             data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
-            fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels)
-            fig.update_traces(texttemplate='Rp%{y:,.0f}', textposition='top_center')
+            fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels, text='revenue')
+            fig.update_traces(texttemplate='Rp%{text:,.0f}', textposition='top_center')
         elif selected_district != 'All Districts':
             data_to_plot = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
             fig = px.bar(data_to_plot, x='outlet', y='revenue', title=f"Revenue by Outlet in {selected_district}", labels=chart_labels, text_auto=True)
