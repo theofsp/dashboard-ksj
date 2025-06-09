@@ -10,7 +10,7 @@ import gc
 st.set_page_config(
     page_title="KSJ Data 2025", 
     layout="wide",
-    page_icon="BLITZ LOGO.png")
+    page_icon="rideblitz_logo.jpeg")
 
 # --- UTILITY FUNCTIONS ---
 def to_excel(df: pd.DataFrame):
@@ -514,9 +514,9 @@ if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            st.image("rideblitz_logo.jpeg", width=150)
+            st.image("BLITZ LOGO.png", width=150)
         except FileNotFoundError:
-            st.warning("Logo file 'rideblitz_logo.jpeg' not found.")
+            st.warning("Logo file 'BLITZ LOGO.png' not found.")
         st.title("Login - KSJ Data Dashboard")
         username_input = st.text_input("Username", placeholder="Enter your username")
         password_input = st.text_input("Password", type="password", placeholder="Enter your password")
@@ -531,7 +531,7 @@ else:
     col1, col2 = st.columns([1, 8])
     with col1:
         try:
-            st.image("rideblitz_logo.jpeg", width=80)
+            st.image("BLITZ LOGO.png", width=80)
         except: pass
     with col2:
         st.title("📊 KSJ Data 2025")
