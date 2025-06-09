@@ -407,50 +407,55 @@ def display_area_analysis():
     kpi_cols[2].metric("Total Active Sellers", f"{active_sellers:,}")
     st.markdown("---")
     
-    st.subheader("Performance Breakdown")
+st.subheader("Performance Breakdown")
     chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet', 'cups': 'Cups Sold'}
     col_revenue_chart, col_cups_chart = st.columns(2)
 
     with col_revenue_chart:
+        # Menentukan data dan judul berdasarkan level filter
         if selected_outlet != 'All Outlets':
+            title = f"Weekly Revenue for {selected_outlet}"
             data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
-            fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels, text='revenue')
-            fig.update_traces(texttemplate='Rp%{text:,.0f}', textposition='top_center')
-        elif selected_district != 'All Districts':
-            data_to_plot = df_filtered.groupby('outlet')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='outlet', y='revenue', title=f"Revenue by Outlet in {selected_district}", labels=chart_labels, text_auto=True)
-            fig.update_traces(texttemplate='Rp%{y:,.0f}')
-        elif selected_city != 'All Cities':
-            data_to_plot = df_filtered.groupby('district')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='district', y='revenue', title=f"Revenue by District in {selected_city}", labels=chart_labels, text_auto=True)
-            fig.update_traces(texttemplate='Rp%{y:,.0f}')
-        elif selected_area != 'All Areas':
-            data_to_plot = df_filtered.groupby('city')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='city', y='revenue', title=f"Revenue by City in {selected_area}", labels=chart_labels, text_auto=True)
-            fig.update_traces(texttemplate='Rp%{y:,.0f}')
+            fig = px.line(data_to_plot, x='week', y='revenue', title=title, markers=True, labels=chart_labels, text='revenue')
+            fig.update_traces(texttemplate='<b>Rp %{text:,.0f}</b>', textposition='top_center')
         else:
-            data_to_plot = df_filtered.groupby('area')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x='area', y='revenue', title="Overall Revenue by Area", labels=chart_labels, text_auto=True)
-            fig.update_traces(texttemplate='Rp%{y:,.0f}')
+            if selected_district != 'All Districts':
+                level, group_col = 'Outlet', 'outlet'
+                title = f"Revenue by Outlet in {selected_district}"
+            elif selected_city != 'All Cities':
+                level, group_col = 'District', 'district'
+                title = f"Revenue by District in {selected_city}"
+            elif selected_area != 'All Areas':
+                level, group_col = 'City', 'city'
+                title = f"Revenue by City in {selected_area}"
+            else:
+                level, group_col = 'Area', 'area'
+                title = "Overall Revenue by Area"
+
+            data_to_plot = df_filtered.groupby(group_col)['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+            fig = px.bar(data_to_plot, x=group_col, y='revenue', title=title, labels=chart_labels, text=data_to_plot['revenue'])
+            fig.update_traces(texttemplate='Rp%{text:,.0f}', textposition='outside')
+        
         st.plotly_chart(fig, use_container_width=True)
 
     with col_cups_chart:
+        # Grafik untuk cups tidak diubah karena tidak memerlukan format Rupiah
         if selected_outlet != 'All Outlets':
             data_to_plot = df_filtered.groupby('week')['cups'].sum().reset_index()
-            fig = px.line(data_to_plot, x='week', y='cups', title=f"Weekly Cups Sold for {selected_outlet}", markers=True, labels=chart_labels)
+            fig_cups = px.line(data_to_plot, x='week', y='cups', title=f"Weekly Cups Sold for {selected_outlet}", markers=True, labels=chart_labels)
         elif selected_district != 'All Districts':
             data_to_plot = df_filtered.groupby('outlet')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig = px.bar(data_to_plot, x='outlet', y='cups', title=f"Cups Sold by Outlet in {selected_district}", labels=chart_labels)
+            fig_cups = px.bar(data_to_plot, x='outlet', y='cups', title=f"Cups Sold by Outlet in {selected_district}", labels=chart_labels, text_auto=True)
         elif selected_city != 'All Cities':
             data_to_plot = df_filtered.groupby('district')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig = px.bar(data_to_plot, x='district', y='cups', title=f"Cups Sold by District in {selected_city}", labels=chart_labels)
+            fig_cups = px.bar(data_to_plot, x='district', y='cups', title=f"Cups Sold by District in {selected_city}", labels=chart_labels, text_auto=True)
         elif selected_area != 'All Areas':
             data_to_plot = df_filtered.groupby('city')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig = px.bar(data_to_plot, x='city', y='cups', title=f"Cups Sold by City in {selected_area}", labels=chart_labels)
+            fig_cups = px.bar(data_to_plot, x='city', y='cups', title=f"Cups Sold by City in {selected_area}", labels=chart_labels, text_auto=True)
         else:
             data_to_plot = df_filtered.groupby('area')['cups'].sum().reset_index().sort_values('cups', ascending=False)
-            fig = px.bar(data_to_plot, x='area', y='cups', title="Overall Cups Sold by Area", labels=chart_labels)
-        st.plotly_chart(fig, use_container_width=True)
+            fig_cups = px.bar(data_to_plot, x='area', y='cups', title="Overall Cups Sold by Area", labels=chart_labels, text_auto=True)
+        st.plotly_chart(fig_cups, use_container_width=True)
     
     st.markdown("---")
     st.subheader("District Productivity Ranking")
