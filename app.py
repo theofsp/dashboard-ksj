@@ -408,36 +408,66 @@ def display_area_analysis():
     kpi_cols[2].metric("Total Active Sellers", f"{active_sellers:,}")
     st.markdown("---")
     
-    st.subheader("Performance Breakdown")
-    # --- BARIS INI YANG DIPERBAIKI INDENTASINYA ---
+   st.subheader("Performance Breakdown")
     chart_labels = {'revenue': 'Revenue', 'area': 'Area', 'city': 'City', 'district': 'District', 'outlet': 'Outlet', 'cups': 'Cups Sold'}
-    
     col_revenue_chart, col_cups_chart = st.columns(2)
 
     with col_revenue_chart:
+        # Menentukan data dan judul berdasarkan level filter
         if selected_outlet != 'All Outlets':
+            title = f"Weekly Revenue for {selected_outlet}"
             data_to_plot = df_filtered.groupby('week')['revenue'].sum().reset_index()
-            fig = px.line(data_to_plot, x='week', y='revenue', title=f"Weekly Revenue for {selected_outlet}", markers=True, labels=chart_labels, text='revenue')
-            fig.update_traces(texttemplate='<b>Rp %{text:,.0f}</b>', textposition='top_center')
+            # Untuk line chart, kita bisa menggunakan texttemplate pada hover atau marker
+            fig = px.line(data_to_plot, x='week', y='revenue', title=title, markers=True, labels=chart_labels)
+            fig.update_traces(hovertemplate='Week=%{x}<br>Revenue=Rp %{y:,.0f}')
         else:
             if selected_district != 'All Districts':
-                level, group_col = 'Outlet', 'outlet'
+                group_col = 'outlet'
                 title = f"Revenue by Outlet in {selected_district}"
             elif selected_city != 'All Cities':
-                level, group_col = 'District', 'district'
+                group_col = 'district'
                 title = f"Revenue by District in {selected_city}"
             elif selected_area != 'All Areas':
-                level, group_col = 'City', 'city'
+                group_col = 'city'
                 title = f"Revenue by City in {selected_area}"
             else:
-                level, group_col = 'Area', 'area'
+                group_col = 'area'
                 title = "Overall Revenue by Area"
 
             data_to_plot = df_filtered.groupby(group_col)['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
-            fig = px.bar(data_to_plot, x=group_col, y='revenue', title=title, labels=chart_labels, text=data_to_plot['revenue'])
-            fig.update_traces(texttemplate='Rp%{text:,.0f}', textposition='outside')
-        
+            
+            # --- METODE BARU: BUAT LABEL SECARA MANUAL ---
+            data_to_plot['revenue_text'] = data_to_plot['revenue'].apply(lambda x: f"Rp {x:,.0f}")
+            fig = px.bar(data_to_plot, x=group_col, y='revenue', title=title, labels=chart_labels, text='revenue_text')
+            fig.update_traces(textposition='outside')
+            # Atur sumbu y agar tidak menampilkan angka yang terlalu rapat
+            fig.update_yaxes(title_text='Revenue (Rp)')
+
         st.plotly_chart(fig, use_container_width=True)
+
+    with col_cups_chart:
+        # Grafik untuk cups tidak diubah karena tidak memerlukan format Rupiah
+        if selected_outlet != 'All Outlets':
+            data_to_plot = df_filtered.groupby('week')['cups'].sum().reset_index()
+            fig_cups = px.line(data_to_plot, x='week', y='cups', title=f"Weekly Cups Sold for {selected_outlet}", markers=True, labels=chart_labels)
+        else:
+            if selected_district != 'All Districts':
+                group_col = 'outlet'
+                title = f"Cups Sold by Outlet in {selected_district}"
+            elif selected_city != 'All Cities':
+                group_col = 'district'
+                title = f"Cups Sold by District in {selected_city}"
+            elif selected_area != 'All Areas':
+                group_col = 'city'
+                title = f"Cups Sold by City in {selected_area}"
+            else:
+                group_col = 'area'
+                title = "Overall Cups Sold by Area"
+            
+            data_to_plot = df_filtered.groupby(group_col)['cups'].sum().reset_index().sort_values('cups', ascending=False)
+            fig_cups = px.bar(data_to_plot, x=group_col, y='cups', title=title, labels=chart_labels, text_auto=True)
+
+        st.plotly_chart(fig_cups, use_container_width=True)
 
     with col_cups_chart:
         if selected_outlet != 'All Outlets':
