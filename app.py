@@ -95,7 +95,7 @@ def display_main_menu():
     with row1_col3:
         with st.container(border=True):
             st.subheader("📍 Area & Outlet Analysis")
-            st.markdown("In-depth analysis based on performance in each area.")
+            st.markdown("Drill down into area-specific performance, with detailed location and outlet-level breakdowns.")
             if st.button("Open Report", key="area_button", use_container_width=True):
                 set_view('area_analysis')
 
