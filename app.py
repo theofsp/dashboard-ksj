@@ -528,56 +528,37 @@ def display_area_analysis():
             st.info("No supply/demand data available for the current filter selection.")
 
 # ===================================================================
-# --- BLOK KODE PAYROLL (VERSI SEDERHANA & AKURAT) ---
+# --- BLOK KODE PAYROLL FINAL (VERSI PERBAIKAN TOTAL) ---
 # ===================================================================
 
 # --- FUNGSI KALKULASI PAYROLL (SUDAH DIPERIKSA ULANG) ---
 
 def calculate_selling_incentive_v2(total_selling):
     """(BAGIAN A - NASIONAL) Menghitung insentif penjualan berdasarkan total selling mingguan."""
-    if 1008000 <= total_selling <= 1440000:
-        multiplier = 0.05
-    elif 1440001 <= total_selling <= 1920000:
-        multiplier = 0.08
-    elif 1920001 <= total_selling <= 2400000:
-        multiplier = 0.09
-    elif 2400001 <= total_selling <= 2640000:
-        multiplier = 0.10
-    elif 2640001 <= total_selling <= 2880000:
-        multiplier = 0.11
-    elif 2880001 <= total_selling <= 3120000:
-        multiplier = 0.1125
-    elif 3120001 <= total_selling <= 3360000:
-        multiplier = 0.115
-    elif 3360001 <= total_selling <= 6240000:
-        multiplier = 0.14
-    elif 6240001 <= total_selling <= 7200000:
-        multiplier = 0.1425
-    elif 7200001 <= total_selling <= 8400000:
-        multiplier = 0.145
-    elif total_selling >= 8400001:
-        multiplier = 0.1475
-    else:
-        multiplier = 0.0
+    if 1008000 <= total_selling <= 1440000: multiplier = 0.05
+    elif 1440001 <= total_selling <= 1920000: multiplier = 0.08
+    elif 1920001 <= total_selling <= 2400000: multiplier = 0.09
+    elif 2400001 <= total_selling <= 2640000: multiplier = 0.10
+    elif 2640001 <= total_selling <= 2880000: multiplier = 0.11
+    elif 2880001 <= total_selling <= 3120000: multiplier = 0.1125
+    elif 3120001 <= total_selling <= 3360000: multiplier = 0.115
+    elif 3360001 <= total_selling <= 6240000: multiplier = 0.14
+    elif 6240001 <= total_selling <= 7200000: multiplier = 0.1425
+    elif 7200001 <= total_selling <= 8400000: multiplier = 0.145
+    elif total_selling >= 8400001: multiplier = 0.1475
+    else: multiplier = 0.0
     return total_selling * multiplier
 
 def calculate_attendance_incentive_jkt_bdg(total_selling, active_days):
     """(BAGIAN B - JKT/BDG) Menghitung insentif kehadiran berdasarkan total selling mingguan."""
     daily_rate = 0
-    if 0 <= total_selling <= 1440000:
-        daily_rate = 25000
-    elif 1440001 <= total_selling <= 1920000:
-        daily_rate = 30000
-    elif 1920001 <= total_selling <= 2400000:
-        daily_rate = 42500
-    elif 2400001 <= total_selling <= 3120000:
-        daily_rate = 45000
-    elif 3120001 <= total_selling <= 4320000:
-        daily_rate = 50000
-    elif 4320001 <= total_selling <= 6240000:
-        daily_rate = 55000
-    elif total_selling >= 6240001:
-        daily_rate = 60000
+    if 0 <= total_selling <= 1440000: daily_rate = 25000
+    elif 1440001 <= total_selling <= 1920000: daily_rate = 30000
+    elif 1920001 <= total_selling <= 2400000: daily_rate = 42500
+    elif 2400001 <= total_selling <= 3120000: daily_rate = 45000
+    elif 3120001 <= total_selling <= 4320000: daily_rate = 50000
+    elif 4320001 <= total_selling <= 6240000: daily_rate = 55000
+    elif total_selling >= 6240001: daily_rate = 60000
     return daily_rate * active_days
 
 def get_daily_incentive_sby_smg(daily_selling):
@@ -591,7 +572,7 @@ def get_daily_incentive_sby_smg(daily_selling):
     elif daily_selling >= 1040001: return 60000
     return 0
 
-# --- FUNGSI UTAMA PAYROLL MANAGEMENT (VERSI SEDERHANA & FOKUS PADA AKURASI) ---
+# --- FUNGSI UTAMA PAYROLL MANAGEMENT (FOKUS PADA AKURASI) ---
 
 def display_payroll_management():
     if st.button("⬅️ Back to Menu"):
@@ -623,31 +604,46 @@ def display_payroll_management():
             st.warning("No sales data found for the selected week and location filters.")
             return
 
-        # Agregasi data: Menghitung total cups DAN total selling
         payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(
             total_cups_sold=('cups', 'sum'),
             total_selling=('selling', 'sum'),
             active_days=('date', 'nunique')
         ).reset_index()
 
-        # Perhitungan insentif
         payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
         payroll_summary['attendance_incentive'] = 0.0
+
+        # Kalkulasi JKT/BDG
         jkt_bdg_mask = payroll_summary['area'].isin(['Jakarta', 'Bandung'])
         if jkt_bdg_mask.any():
             payroll_summary.loc[jkt_bdg_mask, 'attendance_incentive'] = payroll_summary[jkt_bdg_mask].apply(
                 lambda row: calculate_attendance_incentive_jkt_bdg(row['total_selling'], row['active_days']), axis=1)
+
+        # Kalkulasi SBY/SMG (Dengan Logika Baru yang Lebih Eksplisit dan Aman)
         sby_smg_mask = payroll_summary['area'].isin(['Surabaya', 'Semarang'])
         if sby_smg_mask.any():
-            sby_smg_df = final_filtered_df[final_filtered_df['area'].isin(['Surabaya', 'Semarang'])].copy()
-            sby_smg_df['daily_incentive'] = sby_smg_df['selling'].apply(get_daily_incentive_sby_smg)
-            weekly_attendance_sby_smg = sby_smg_df.groupby(['ridername', 'area'])['daily_incentive'].sum()
-            temp_summary = payroll_summary.set_index(['ridername', 'area'])
-            temp_summary['attendance_incentive'].update(weekly_attendance_sby_smg)
-            payroll_summary = temp_summary.reset_index()
+            # Iterasi hanya pada rider SBY/SMG untuk dihitung ulang
+            for index, rider_summary_row in payroll_summary[sby_smg_mask].iterrows():
+                rider_name = rider_summary_row['ridername']
+                rider_area = rider_summary_row['area']
+                
+                # Ambil semua transaksi harian untuk rider ini
+                rider_transactions = final_filtered_df[
+                    (final_filtered_df['ridername'] == rider_name) &
+                    (final_filtered_df['area'] == rider_area)
+                ]
+                
+                # Agregasi penjualan per hari
+                daily_sales = rider_transactions.groupby(rider_transactions['date'].dt.date)['selling'].sum()
+                
+                # Hitung insentif untuk setiap hari dan jumlahkan
+                total_weekly_incentive = sum(daily_sales.apply(get_daily_incentive_sby_smg))
+                
+                # Masukkan hasil yang benar ke baris yang sesuai di tabel utama
+                payroll_summary.loc[index, 'attendance_incentive'] = total_weekly_incentive
+        
         payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
         
-        # Mengubah nama kolom untuk ditampilkan
         display_df = payroll_summary.rename(columns={
             'ridername': 'Rider Name', 'area': 'Area', 'total_cups_sold': 'Total Cups Sold',
             'total_selling': 'Total Selling', 'active_days': 'Active Days', 
@@ -658,7 +654,6 @@ def display_payroll_management():
         st.markdown("---")
         st.subheader(f"Payroll Summary for Week {selected_week}")
         
-        # Kembali menggunakan st.dataframe yang ringan dengan format yang benar
         st.dataframe(
             display_df[[
                 'Rider Name', 'Area', 'Total Cups Sold', 'Total Selling', 'Active Days', 
@@ -681,7 +676,6 @@ def display_payroll_management():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
     else:
         st.info("Please select a week to view the payroll report.")
 
