@@ -611,7 +611,7 @@ def display_payroll_management():
             st.rerun()
         
         st.markdown("---")
-        # --- Layout Slip Gaji (logika dari fungsi dialog lama) ---
+        # --- Layout Slip Gaji ---
         col1, col2 = st.columns([5, 1])
         with col1: st.subheader("SLIP GAJI MINGGUAN")
         with col2:
@@ -620,7 +620,6 @@ def display_payroll_management():
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
         c1.metric("NAMA RIDER", payslip_data['Rider Name'])
-        # FIX 1: 'Week' sekarang sudah ada di payslip_data
         c2.metric("PERIODE MINGGU", f"Minggu ke-{payslip_data['Week']}")
         c3.metric("AREA", payslip_data['Area'])
         st.markdown("---")
@@ -689,13 +688,15 @@ def display_payroll_management():
             payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
             
             display_df = payroll_summary.rename(columns={'ridername': 'Rider Name', 'area': 'Area', 'total_selling': 'Total Selling', 'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive', 'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'})
-            # Menambahkan kolom 'Week' ke dataframe utama
             display_df['Week'] = selected_week
 
             st.markdown("---")
             st.subheader(f"Payroll Summary for Week {selected_week}")
             
-            # Buat dataframe baru khusus untuk editor agar tidak mengganggu data asli
+            # FIX: Ganti nilai NaN dengan 0 sebelum ditampilkan di editor
+            numeric_cols = ['Total Selling', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']
+            display_df[numeric_cols] = display_df[numeric_cols].fillna(0)
+
             editor_df = display_df.copy()
             editor_df['Pilih'] = False
             
@@ -708,22 +709,13 @@ def display_payroll_management():
                 hide_index=True,
                 column_order=cols_to_display,
                 disabled=disabled_cols,
-                column_config={
-                    # FIX 2: Menggunakan format 'Rp_%,d' untuk pemisah ribuan
-                    "Total Selling": st.column_config.NumberColumn(format="Rp %,d"),
-                    "Selling Incentive": st.column_config.NumberColumn(format="Rp %,d"),
-                    "Attendance Incentive": st.column_config.NumberColumn(format="Rp %,d"),
-                    "Accumulated Fee": st.column_config.NumberColumn(format="Rp %,d"),
-                }
+                column_config={"Total Selling": st.column_config.NumberColumn(format="Rp %,d"), "Selling Incentive": st.column_config.NumberColumn(format="Rp %,d"), "Attendance Incentive": st.column_config.NumberColumn(format="Rp %,d"), "Accumulated Fee": st.column_config.NumberColumn(format="Rp %,d")}
             )
 
             selected_rows = edited_df[edited_df['Pilih']]
             if not selected_rows.empty:
                 selected_index = selected_rows.index[0]
-                
-                # FIX 1: Ambil data dari dataframe LENGKAP ('display_df') menggunakan index yang didapat
                 payslip_data = display_df.loc[selected_index]
-                
                 st.session_state.viewing_payslip_data = payslip_data.to_dict()
 
                 if payslip_data['Area'] in ['Surabaya', 'Semarang']:
@@ -735,11 +727,10 @@ def display_payroll_management():
                     st.session_state.daily_details_for_payslip = daily_details_df
                 else:
                     st.session_state.daily_details_for_payslip = None
-                
                 st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
-            st.download_button(label="📥 Export Payroll Data to Excel", data=to_excel(display_df[['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']]), file_name=f"payroll_week_{selected_week}_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button(label="📥 Export Payroll Data to Excel", data=to_excel(display_df[cols_to_display[:-1]]), file_name=f"payroll_week_{selected_week}_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
         else:
             st.info("Please select a week to view the payroll report.")
