@@ -608,7 +608,7 @@ def display_payroll_management():
         time_filtered_df = df[df['week'] == selected_week].copy()
 
         st.markdown("---")
-        st.subheader("Geographic Filters (Optional)")
+        st.subheader("Geographic Filters")
 
         # --- FILTER GEOGRAFIS BERJENJANG (MULTI-SELECT) ---
         
