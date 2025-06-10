@@ -602,7 +602,10 @@ def display_payslip_dialog(payslip_data, daily_details_df=None):
         with col1:
             st.subheader("SLIP GAJI MINGGUAN")
         with col2:
-            st.image("BLITZ LOGO.png", width=60)
+            try:
+                st.image("BLITZ LOGO.png", width=60)
+            except FileNotFoundError:
+                pass # Jangan tampilkan gambar jika file tidak ada
         st.markdown("---")
 
         # --- Informasi Dasar ---
@@ -622,7 +625,6 @@ def display_payslip_dialog(payslip_data, daily_details_df=None):
         # --- Rincian Gaji ---
         st.subheader("Rincian Gaji")
         
-        # Insentif Penjualan (Sama untuk semua)
         st.markdown(f"**Insentif Penjualan:** `Rp {int(payslip_data['Selling Incentive']):,.0f}`")
         st.markdown(f"**Insentif Kehadiran:** `Rp {int(payslip_data['Attendance Incentive']):,.0f}`")
 
@@ -638,35 +640,11 @@ def display_payslip_dialog(payslip_data, daily_details_df=None):
                 hide_index=True
             )
 
-        # --- Tombol Print ---
         st.markdown("<br>", unsafe_allow_html=True)
-        print_button_html = """
-        <style>
-            .print-button {
-                background-color: #4CAF50;
-                color: white;
-                padding: 10px 20px;
-                text-align: center;
-                text-decoration: none;
-                display: inline-block;
-                font-size: 16px;
-                margin: 4px 2px;
-                cursor: pointer;
-                border-radius: 8px;
-                border: none;
-            }
-        </style>
-        <button onclick="window.print()" class="print-button">
-            🖨️ PRINT
-        </button>
-        """
+        print_button_html = """<button onclick="window.print()" style="padding:10px 20px; font-size:16px; cursor:pointer; border-radius:8px; border:none; background-color:#4CAF50; color:white;">🖨️ PRINT</button>"""
         st.components.v1.html(print_button_html, height=50)
 
 def display_payroll_management():
-    # --- Inisialisasi State untuk Dialog ---
-    if 'show_payslip_for' not in st.session_state:
-        st.session_state.show_payslip_for = None
-    
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
         return
@@ -706,43 +684,33 @@ def display_payroll_management():
             st.warning("No sales data found for the selected week and location filters.")
             return
 
-        # --- PERHITUNGAN PAYROLL BARU ---
         payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(
             total_selling=('selling', 'sum'),
             active_days=('date', 'nunique')
         ).reset_index()
 
-        # 1. Hitung Insentif Penjualan (Nasional)
         payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
-
-        # 2. Hitung Insentif Kehadiran (Kondisional per Area)
         payroll_summary['attendance_incentive'] = 0.0
 
-        # Kalkulasi untuk JKT/BDG
         jkt_bdg_mask = payroll_summary['area'].isin(['Jakarta', 'Bandung'])
-        payroll_summary.loc[jkt_bdg_mask, 'attendance_incentive'] = payroll_summary[jkt_bdg_mask].apply(
-            lambda row: calculate_attendance_incentive_jkt_bdg(row['total_selling'], row['active_days']),
-            axis=1
-        )
+        if jkt_bdg_mask.any():
+            payroll_summary.loc[jkt_bdg_mask, 'attendance_incentive'] = payroll_summary[jkt_bdg_mask].apply(
+                lambda row: calculate_attendance_incentive_jkt_bdg(row['total_selling'], row['active_days']),
+                axis=1
+            )
         
-        # Kalkulasi untuk SBY/SMG
         sby_smg_mask = payroll_summary['area'].isin(['Surabaya', 'Semarang'])
         if sby_smg_mask.any():
-            # Filter data mentah hanya untuk rider & area SBY/SMG di minggu ini
-            sby_smg_df = final_filtered_df[final_filtered_df['area'].isin(['Surabaya', 'Semarang'])]
-            # Hitung gaji harian
+            sby_smg_df = final_filtered_df[final_filtered_df['area'].isin(['Surabaya', 'Semarang'])].copy()
             sby_smg_df['daily_incentive'] = sby_smg_df['selling'].apply(get_daily_incentive_sby_smg)
-            # Agregasi total insentif kehadiran mingguan
             weekly_attendance_sby_smg = sby_smg_df.groupby(['ridername', 'area'])['daily_incentive'].sum()
-            # Map hasilnya kembali ke tabel summary utama
-            payroll_summary.set_index(['ridername', 'area'], inplace=True)
-            payroll_summary['attendance_incentive'].update(weekly_attendance_sby_smg)
-            payroll_summary.reset_index(inplace=True)
             
-        # 3. Hitung Total Gaji
+            temp_summary = payroll_summary.set_index(['ridername', 'area'])
+            temp_summary['attendance_incentive'].update(weekly_attendance_sby_smg)
+            payroll_summary = temp_summary.reset_index()
+            
         payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
         
-        # --- TAMPILAN TABEL & FITUR DETAIL ---
         display_df = payroll_summary.rename(columns={
             'ridername': 'Rider Name', 'area': 'Area', 'total_selling': 'Total Selling',
             'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive',
@@ -762,28 +730,24 @@ def display_payroll_management():
             use_container_width=True, hide_index=True
         )
         
-        # --- Fitur View Detail ---
         st.markdown("---")
         st.subheader("View Detail Payslip")
         
-        # Buat daftar pilihan yang unik untuk selectbox
         options_list = [f"{row['Rider Name']} - {row['Area']}" for index, row in display_df.iterrows()]
         
         selected_rider_key = st.selectbox(
             "Select a Rider to View Payslip", 
-            options=options_list,
-            index=None,
-            placeholder="Choose a rider..."
+            options=[""] + options_list,
+            index=0,
+            format_func=lambda x: "Choose a rider..." if x == "" else x
         )
         
         if selected_rider_key:
-            # Cari data yang cocok di display_df
             selected_rider_name, selected_rider_area = selected_rider_key.split(' - ')
             payslip_data = display_df[(display_df['Rider Name'] == selected_rider_name) & (display_df['Area'] == selected_rider_area)].iloc[0]
             
             daily_details_df = None
             if selected_rider_area in ['Surabaya', 'Semarang']:
-                # Ambil detail harian untuk rider SBY/SMG yang dipilih
                 daily_df = final_filtered_df[
                     (final_filtered_df['ridername'] == selected_rider_name) & 
                     (final_filtered_df['area'] == selected_rider_area)
@@ -795,7 +759,6 @@ def display_payroll_management():
                 daily_details_df = daily_details_df[['Hari', 'Tanggal', 'Penjualan Harian', 'Gaji Harian']]
                 daily_details_df['Tanggal'] = daily_details_df['Tanggal'].dt.strftime('%d %B %Y')
 
-            # Tampilkan dialog
             display_payslip_dialog(payslip_data, daily_details_df)
 
     else:
