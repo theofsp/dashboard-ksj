@@ -589,7 +589,7 @@ def display_payroll_management():
     st.markdown("---")
     st.header("💸 Payroll Management")
 
-    st.subheader("Section 1: Weekly Payroll")
+    st.subheader("Weekly Payroll")
     
     df = st.session_state["main_df"]
     
