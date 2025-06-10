@@ -527,6 +527,61 @@ def display_area_analysis():
         else:
             st.info("No supply/demand data available for the current filter selection.")
 
+# ===================================================================
+# --- LETAKKAN DUA FUNGSI BARU (SELLING & ATTENDANCE) DI SINI ---
+# ===================================================================
+
+def calculate_selling_incentive(total_cups):
+    """Menghitung insentif penjualan berdasarkan total cup."""
+    base_revenue = total_cups * 8000
+    multiplier = 0.0
+    
+    if 121 <= total_cups <= 180:
+        multiplier = 0.05
+    elif 181 <= total_cups <= 240:
+        multiplier = 0.08
+    elif 241 <= total_cups <= 300:
+        multiplier = 0.09
+    elif 301 <= total_cups <= 330:
+        multiplier = 0.10
+    elif 331 <= total_cups <= 360:
+        multiplier = 0.11
+    elif 361 <= total_cups <= 390:
+        multiplier = 0.1125
+    elif 391 <= total_cups <= 420:
+        multiplier = 0.1150
+    elif 421 <= total_cups <= 780:
+        multiplier = 0.14
+    elif 781 <= total_cups <= 900:
+        multiplier = 0.1425
+    elif 901 <= total_cups <= 1050:
+        multiplier = 0.1450
+    elif total_cups >= 1051:
+        multiplier = 0.1475
+        
+    return base_revenue * multiplier
+
+def calculate_attendance_incentive(total_cups, active_days):
+    """Menghitung insentif kehadiran berdasarkan total cup dan jumlah hari kerja."""
+    daily_rate = 0
+    
+    if 0 <= total_cups <= 180:
+        daily_rate = 25000
+    elif 181 <= total_cups <= 240:
+        daily_rate = 30000
+    elif 241 <= total_cups <= 300:
+        daily_rate = 42500
+    elif 301 <= total_cups <= 390:
+        daily_rate = 45000
+    elif 391 <= total_cups <= 540:
+        daily_rate = 50000
+    elif 541 <= total_cups <= 780:
+        daily_rate = 55000
+    elif total_cups >= 781:
+        daily_rate = 60000
+        
+    return daily_rate * active_days
+
 def display_payroll_management():
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
