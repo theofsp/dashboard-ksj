@@ -68,7 +68,7 @@ def display_main_menu():
     st.header("Main Menu")
     st.markdown("Select an analysis to view from the options below.")
     
-    # --- REVISI: Mengubah layout kembali menjadi 3 kolom ---
+    # Mengubah layout kembali menjadi 3 kolom per baris
     row1_col1, row1_col2, row1_col3 = st.columns(3, gap="large")
 
     with row1_col1:
@@ -76,6 +76,7 @@ def display_main_menu():
             st.subheader("📊 All Data")
             st.markdown("View all raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
             if st.button("Open Report", key="grup1_button", use_container_width=True):
+                # Logika untuk inisialisasi filter grup 1
                 df = st.session_state["main_df"]
                 st.session_state.grup1_filter_options = {}
                 for col in df.columns:
@@ -94,7 +95,7 @@ def display_main_menu():
     with row1_col3:
         with st.container(border=True):
             st.subheader("📍 Area & Outlet Analysis")
-            st.markdown("Drill down into area-specific performance, with detailed location and outlet-level breakdowns.")
+            st.markdown("In-depth analysis based on performance in each area.")
             if st.button("Open Report", key="area_button", use_container_width=True):
                 set_view('area_analysis')
 
@@ -581,6 +582,5 @@ else:
         display_grup_2()
     elif current_view == "area_analysis":
         display_area_analysis()
-    # --- TAMBAHKAN BARIS INI ---
     elif current_view == "payroll_management":
         display_payroll_management()
