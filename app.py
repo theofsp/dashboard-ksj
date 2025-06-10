@@ -602,30 +602,65 @@ def display_payroll_management():
         placeholder="Choose a week"
     )
 
-    # 2. Jika week sudah dipilih, proses data
+    # Proses hanya jika minggu sudah dipilih
     if selected_week:
-        # Filter data berdasarkan minggu yang dipilih
-        weekly_df = df[df['week'] == selected_week].copy()
+        # Filter data berdasarkan minggu yang dipilih terlebih dahulu
+        time_filtered_df = df[df['week'] == selected_week].copy()
 
-        if weekly_df.empty:
-            st.info(f"No sales data found for week {selected_week}.")
-            return
+        st.markdown("---")
+        st.subheader("Geographic Filters (Optional)")
+
+        # --- FILTER GEOGRAFIS BERJENJANG (MULTI-SELECT) ---
+        
+        # Filter Area
+        area_options = sorted(time_filtered_df['area'].unique())
+        selected_areas = st.multiselect("Select Area(s)", options=area_options, placeholder="Leave empty to select all")
+        
+        # Filter data berdasarkan area yang dipilih
+        if selected_areas:
+            area_filtered_df = time_filtered_df[time_filtered_df['area'].isin(selected_areas)]
+        else:
+            area_filtered_df = time_filtered_df
+
+        # Filter City (opsi bergantung pada pilihan area)
+        city_options = sorted(area_filtered_df['city'].unique())
+        selected_cities = st.multiselect("Select City/Cities", options=city_options, placeholder="Leave empty to select all")
+
+        # Filter data berdasarkan kota yang dipilih
+        if selected_cities:
+            city_filtered_df = area_filtered_df[area_filtered_df['city'].isin(selected_cities)]
+        else:
+            city_filtered_df = area_filtered_df
+            
+        # Filter District (opsi bergantung pada pilihan kota)
+        district_options = sorted(city_filtered_df['district'].unique())
+        selected_districts = st.multiselect("Select District(s)", options=district_options, placeholder="Leave empty to select all")
+
+        # Data final yang akan diolah setelah semua filter diterapkan
+        if selected_districts:
+            final_filtered_df = city_filtered_df[city_filtered_df['district'].isin(selected_districts)]
+        else:
+            final_filtered_df = city_filtered_df
+        
+        # Periksa apakah ada data setelah difilter
+        if final_filtered_df.empty:
+            st.warning("No sales data found for the selected week and location filters.")
+            return # Hentikan proses jika tidak ada data
+
+        # --- PERHITUNGAN PAYROLL (MENGGUNAKAN DATA YANG SUDAH DIFILTER) ---
 
         # Agregasi data per Rider
-        payroll_summary = weekly_df.groupby('ridername').agg(
+        payroll_summary = final_filtered_df.groupby('ridername').agg(
             total_cups_sold=('cups', 'sum'),
             active_days=('date', 'nunique')
         ).reset_index()
 
-        # 3. Hitung insentif
+        # Hitung insentif
         payroll_summary['selling_incentive'] = payroll_summary['total_cups_sold'].apply(calculate_selling_incentive)
-        
         payroll_summary['attendance_incentive'] = payroll_summary.apply(
             lambda row: calculate_attendance_incentive(row['total_cups_sold'], row['active_days']),
             axis=1
         )
-        
-        # BARU: Hitung total fee dengan menjumlahkan kedua insentif
         payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
 
         # Siapkan DataFrame final untuk ditampilkan
@@ -634,22 +669,21 @@ def display_payroll_management():
             'total_cups_sold': 'Total Cups Sold',
             'selling_incentive': 'Selling Incentive',
             'attendance_incentive': 'Attendance Incentive',
-            'accumulated_fee': 'Accumulated Fee' # BARU: Tambahkan kolom baru ke kamus rename
+            'accumulated_fee': 'Accumulated Fee'
         })
-
-        # BARU: Tambahkan kolom baru ke daftar kolom final
+        
         final_cols = ['Rider Name', 'Total Cups Sold', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']
         display_df = display_df[final_cols]
         
         st.markdown("---")
         st.subheader(f"Payroll Summary for Week {selected_week}")
 
-        # Tampilkan tabel dengan format mata uang
+        # Tampilkan tabel
         st.dataframe(
             display_df.style.format({
                 "Selling Incentive": "Rp {:,.0f}",
                 "Attendance Incentive": "Rp {:,.0f}",
-                "Accumulated Fee": "Rp {:,.0f}" # BARU: Tambahkan format untuk kolom baru
+                "Accumulated Fee": "Rp {:,.0f}"
             }),
             use_container_width=True,
             hide_index=True
@@ -659,7 +693,7 @@ def display_payroll_management():
         st.download_button(
             label="📥 Export Payroll Data to Excel",
             data=to_excel(display_df),
-            file_name=f"payroll_week_{selected_week}.xlsx",
+            file_name=f"payroll_week_{selected_week}_filtered.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
