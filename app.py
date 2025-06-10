@@ -528,10 +528,10 @@ def display_area_analysis():
             st.info("No supply/demand data available for the current filter selection.")
 
 # ===================================================================
-# --- BLOK KODE PAYROLL FINAL ---
+# --- BLOK KODE PAYROLL FINAL (VERSI STABIL) ---
 # ===================================================================
 
-# --- FUNGSI KALKULASI PAYROLL BARU (BERBASIS SELLING) ---
+# --- FUNGSI KALKULASI PAYROLL (SUDAH DIPERIKSA ULANG) ---
 
 def calculate_selling_incentive_v2(total_selling):
     """(BAGIAN A - NASIONAL) Menghitung insentif penjualan berdasarkan total selling mingguan."""
@@ -582,42 +582,30 @@ def calculate_attendance_incentive_jkt_bdg(total_selling, active_days):
 
 def get_daily_incentive_sby_smg(daily_selling):
     """(Helper untuk SBY/SMG) Menentukan tarif insentif harian berdasarkan selling harian."""
-    if 0 <= daily_selling <= 240000:
-        return 25000
-    elif 240001 <= daily_selling <= 320000:
-        return 30000
-    elif 320001 <= daily_selling <= 400000:
-        return 42500
-    elif 400001 <= daily_selling <= 520000:
-        return 45000
-    elif 520001 <= daily_selling <= 720000:
-        return 50000
-    elif 720001 <= daily_selling <= 1040000:
-        return 55000
-    elif daily_selling >= 1040001:
-        return 60000
+    if 0 <= daily_selling <= 240000: return 25000
+    elif 240001 <= daily_selling <= 320000: return 30000
+    elif 320001 <= daily_selling <= 400000: return 42500
+    elif 400001 <= daily_selling <= 520000: return 45000
+    elif 520001 <= daily_selling <= 720000: return 50000
+    elif 720001 <= daily_selling <= 1040000: return 55000
+    elif daily_selling >= 1040001: return 60000
     return 0
 
-# --- FUNGSI UTAMA PAYROLL MANAGEMENT (VERSI FINAL) ---
+# --- FUNGSI UTAMA PAYROLL MANAGEMENT (VERSI FINAL & STABIL) ---
 
 def display_payroll_management():
-    # State untuk mengontrol tampilan antara tabel utama dan detail slip gaji
     if 'viewing_payslip_data' not in st.session_state:
         st.session_state.viewing_payslip_data = None
         st.session_state.daily_details_for_payslip = None
 
-    # TAMPILAN 2: DETAIL SLIP GAJI
     if st.session_state.viewing_payslip_data is not None:
         payslip_data = st.session_state.viewing_payslip_data
         daily_details_df = st.session_state.daily_details_for_payslip
-
         if st.button("⬅️ Back to Payroll Summary"):
             st.session_state.viewing_payslip_data = None
             st.session_state.daily_details_for_payslip = None
             st.rerun()
-        
         st.markdown("---")
-        # Layout Slip Gaji
         col1, col2 = st.columns([5, 1])
         with col1: st.subheader("SLIP GAJI MINGGUAN")
         with col2:
@@ -639,12 +627,11 @@ def display_payroll_management():
         st.markdown(f"**Insentif Kehadiran:** `Rp {payslip_data['Attendance Incentive']:,}`")
         if payslip_data['Area'] in ['Surabaya', 'Semarang'] and daily_details_df is not None:
             st.markdown("###### Rincian Insentif Kehadiran Harian:")
-            st.dataframe(daily_details_df.style.format({"Penjualan Harian": "Rp {:,.0f}","Gaji Harian": "Rp {:,.0f}"}), use_container_width=True, hide_index=True)
+            st.dataframe(daily_details_df.style.format({"Penjualan Harian": "Rp {:,.0f}", "Gaji Harian": "Rp {:,.0f}"}), use_container_width=True, hide_index=True)
         st.markdown("<br>", unsafe_allow_html=True)
         print_button_html = """<button onclick="window.print()" style="padding:10px 20px; font-size:16px; cursor:pointer; border-radius:8px; border:none; background-color:#4CAF50; color:white;">🖨️ PRINT</button>"""
         st.components.v1.html(print_button_html, height=50)
 
-    # TAMPILAN 1: TABEL RINGKASAN PAYROLL (Default)
     else:
         if st.button("⬅️ Back to Menu"):
             set_view('main_menu')
@@ -653,14 +640,12 @@ def display_payroll_management():
         st.header("💸 Payroll Management")
         st.subheader("Weekly Payroll")
         df = st.session_state["main_df"]
-        
         selected_week = st.selectbox("Select a Week to Calculate Payroll", options=sorted(df['week'].unique()), index=None, placeholder="Choose a week")
 
         if selected_week:
             time_filtered_df = df[df['week'] == selected_week].copy()
             st.markdown("---")
             st.subheader("Geographic Filters (Optional)")
-            
             area_options = sorted(time_filtered_df['area'].unique())
             selected_areas = st.multiselect("Select Area(s)", options=area_options, placeholder="Leave empty to select all")
             area_filtered_df = time_filtered_df[time_filtered_df['area'].isin(selected_areas)] if selected_areas else time_filtered_df
@@ -698,19 +683,25 @@ def display_payroll_management():
             display_df = payroll_summary.rename(columns={'ridername': 'Rider Name', 'area': 'Area', 'total_selling': 'Total Selling', 'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive', 'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'})
             display_df['Week'] = selected_week
 
+            # --- PERUBAHAN UTAMA: FORMAT ANGKA MENJADI TEKS SECARA MANUAL ---
+            display_df['Total Selling (Rp)'] = display_df['Total Selling'].apply(lambda x: f"Rp {x:,}")
+            display_df['Selling Incentive (Rp)'] = display_df['Selling Incentive'].apply(lambda x: f"Rp {x:,}")
+            display_df['Attendance Incentive (Rp)'] = display_df['Attendance Incentive'].apply(lambda x: f"Rp {x:,}")
+            display_df['Accumulated Fee (Rp)'] = display_df['Accumulated Fee'].apply(lambda x: f"Rp {x:,}")
+
             st.markdown("---")
             st.subheader(f"Payroll Summary for Week {selected_week}")
             
             editor_df = display_df.copy()
             editor_df['Detail'] = False
             
-            cols_to_display = ['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee', 'Detail']
+            cols_to_display = ['Rider Name', 'Area', 'Total Selling (Rp)', 'Active Days', 'Selling Incentive (Rp)', 'Attendance Incentive (Rp)', 'Accumulated Fee (Rp)', 'Detail']
             disabled_cols = [col for col in cols_to_display if col != 'Detail']
 
             edited_df = st.data_editor(
-                editor_df,
+                editor_df[cols_to_display],
                 use_container_width=True, hide_index=True, column_order=cols_to_display, disabled=disabled_cols,
-                column_config={"Total Selling": st.column_config.NumberColumn(format="Rp %,d"), "Selling Incentive": st.column_config.NumberColumn(format="Rp %,d"), "Attendance Incentive": st.column_config.NumberColumn(format="Rp %,d"), "Accumulated Fee": st.column_config.NumberColumn(format="Rp %,d"), "Detail": st.column_config.CheckboxColumn(help="Centang untuk melihat detail slip gaji")}
+                column_config={"Detail": st.column_config.CheckboxColumn(help="Centang untuk melihat detail slip gaji")}
             )
 
             selected_rows = edited_df[edited_df['Detail']]
@@ -730,7 +721,7 @@ def display_payroll_management():
                 st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
-            st.download_button(label="📥 Export Payroll Data to Excel", data=to_excel(display_df[cols_to_display[:-1]]), file_name=f"payroll_week_{selected_week}_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button(label="📥 Export Payroll Data to Excel", data=to_excel(display_df[['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']]), file_name=f"payroll_week_{selected_week}_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
         else:
             st.info("Please select a week to view the payroll report.")
