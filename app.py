@@ -620,6 +620,7 @@ def display_payroll_management():
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
         c1.metric("NAMA RIDER", payslip_data['Rider Name'])
+        # FIX 1: 'Week' sekarang sudah ada di payslip_data
         c2.metric("PERIODE MINGGU", f"Minggu ke-{payslip_data['Week']}")
         c3.metric("AREA", payslip_data['Area'])
         st.markdown("---")
@@ -688,48 +689,45 @@ def display_payroll_management():
             payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
             
             display_df = payroll_summary.rename(columns={'ridername': 'Rider Name', 'area': 'Area', 'total_selling': 'Total Selling', 'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive', 'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'})
+            # Menambahkan kolom 'Week' ke dataframe utama
             display_df['Week'] = selected_week
 
-            # --- [PERUBAHAN] Menggunakan st.data_editor ---
             st.markdown("---")
             st.subheader(f"Payroll Summary for Week {selected_week}")
             
-            # Tambah kolom 'Pilih' untuk interaktivitas
-            display_df['Pilih'] = False
+            # Buat dataframe baru khusus untuk editor agar tidak mengganggu data asli
+            editor_df = display_df.copy()
+            editor_df['Pilih'] = False
             
-            # Siapkan kolom-kolom yang akan ditampilkan dan yang akan dinonaktifkan
             cols_to_display = ['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee', 'Pilih']
-            disabled_cols = ['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']
-
-            # Simpan dataframe sebelum diedit untuk perbandingan
-            df_before_edit = display_df[cols_to_display].copy()
+            disabled_cols = [col for col in cols_to_display if col != 'Pilih']
 
             edited_df = st.data_editor(
-                df_before_edit,
+                editor_df,
                 use_container_width=True,
                 hide_index=True,
                 column_order=cols_to_display,
                 disabled=disabled_cols,
                 column_config={
-                    "Total Selling": st.column_config.NumberColumn(format="Rp %d"),
-                    "Selling Incentive": st.column_config.NumberColumn(format="Rp %d"),
-                    "Attendance Incentive": st.column_config.NumberColumn(format="Rp %d"),
-                    "Accumulated Fee": st.column_config.NumberColumn(format="Rp %d"),
+                    # FIX 2: Menggunakan format 'Rp_%,d' untuk pemisah ribuan
+                    "Total Selling": st.column_config.NumberColumn(format="Rp %,d"),
+                    "Selling Incentive": st.column_config.NumberColumn(format="Rp %,d"),
+                    "Attendance Incentive": st.column_config.NumberColumn(format="Rp %,d"),
+                    "Accumulated Fee": st.column_config.NumberColumn(format="Rp %,d"),
                 }
             )
 
-            # Cek apakah ada baris yang dicentang
             selected_rows = edited_df[edited_df['Pilih']]
             if not selected_rows.empty:
-                # Ambil data baris pertama yang dicentang
-                selected_row = selected_rows.iloc[0]
+                selected_index = selected_rows.index[0]
                 
-                # Simpan datanya di session state untuk ditampilkan di halaman detail
-                st.session_state.viewing_payslip_data = selected_row.to_dict()
+                # FIX 1: Ambil data dari dataframe LENGKAP ('display_df') menggunakan index yang didapat
+                payslip_data = display_df.loc[selected_index]
+                
+                st.session_state.viewing_payslip_data = payslip_data.to_dict()
 
-                # Hitung detail harian jika areanya SBY/SMG
-                if selected_row['Area'] in ['Surabaya', 'Semarang']:
-                    daily_df = final_filtered_df[(final_filtered_df['ridername'] == selected_row['Rider Name']) & (final_filtered_df['area'] == selected_row['Area'])].copy()
+                if payslip_data['Area'] in ['Surabaya', 'Semarang']:
+                    daily_df = final_filtered_df[(final_filtered_df['ridername'] == payslip_data['Rider Name']) & (final_filtered_df['area'] == payslip_data['Area'])].copy()
                     daily_df['Gaji Harian'] = daily_df['selling'].apply(get_daily_incentive_sby_smg)
                     daily_details_df = daily_df.rename(columns={'date': 'Tanggal', 'day': 'Hari', 'selling': 'Penjualan Harian'})
                     daily_details_df = daily_details_df[['Hari', 'Tanggal', 'Penjualan Harian', 'Gaji Harian']]
