@@ -612,32 +612,33 @@ def display_payroll_management():
             return
 
         # Agregasi data per Rider
-        # Hitung total cups dan jumlah hari aktif (berdasarkan tanggal unik)
         payroll_summary = weekly_df.groupby('ridername').agg(
             total_cups_sold=('cups', 'sum'),
             active_days=('date', 'nunique')
         ).reset_index()
 
-        # 3. Hitung insentif menggunakan fungsi yang sudah dibuat
-        # Bagian A: Selling Incentive
+        # 3. Hitung insentif
         payroll_summary['selling_incentive'] = payroll_summary['total_cups_sold'].apply(calculate_selling_incentive)
         
-        # Bagian B: Attendance Incentive
         payroll_summary['attendance_incentive'] = payroll_summary.apply(
             lambda row: calculate_attendance_incentive(row['total_cups_sold'], row['active_days']),
             axis=1
         )
+        
+        # BARU: Hitung total fee dengan menjumlahkan kedua insentif
+        payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
 
         # Siapkan DataFrame final untuk ditampilkan
         display_df = payroll_summary.rename(columns={
             'ridername': 'Rider Name',
             'total_cups_sold': 'Total Cups Sold',
             'selling_incentive': 'Selling Incentive',
-            'attendance_incentive': 'Attendance Incentive'
+            'attendance_incentive': 'Attendance Incentive',
+            'accumulated_fee': 'Accumulated Fee' # BARU: Tambahkan kolom baru ke kamus rename
         })
 
-        # Pilih dan urutkan kolom sesuai permintaan
-        final_cols = ['Rider Name', 'Total Cups Sold', 'Selling Incentive', 'Attendance Incentive']
+        # BARU: Tambahkan kolom baru ke daftar kolom final
+        final_cols = ['Rider Name', 'Total Cups Sold', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']
         display_df = display_df[final_cols]
         
         st.markdown("---")
@@ -647,7 +648,8 @@ def display_payroll_management():
         st.dataframe(
             display_df.style.format({
                 "Selling Incentive": "Rp {:,.0f}",
-                "Attendance Incentive": "Rp {:,.0f}"
+                "Attendance Incentive": "Rp {:,.0f}",
+                "Accumulated Fee": "Rp {:,.0f}" # BARU: Tambahkan format untuk kolom baru
             }),
             use_container_width=True,
             hide_index=True
