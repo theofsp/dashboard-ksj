@@ -593,29 +593,29 @@ def display_payroll_management():
         st.markdown("---")
         # Layout Slip Gaji
         col1, col2 = st.columns([5, 1])
-        with col1: st.subheader("SLIP GAJI MINGGUAN")
+        with col1: st.subheader("WEEKLY PAYSLIP")
         with col2:
             try: st.image("BLITZ LOGO.png", width=60)
             except: pass
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
-        c1.metric("NAMA RIDER", payslip_data['Rider Name'])
-        c2.metric("PERIODE MINGGU", f"Minggu ke-{payslip_data['Week']}")
+        c1.metric("RIDER NAME", payslip_data['Rider Name'])
+        c2.metric("WEEK", f"Week-{payslip_data['Week']}")
         c3.metric("AREA", payslip_data['Area'])
         st.markdown("---")
-        st.markdown(f"#### Total Gaji: **Rp {payslip_data['Accumulated Fee']:,}**")
+        st.markdown(f"#### Total Fee: **Rp {payslip_data['Accumulated Fee']:,}**")
         sc1, sc2 = st.columns(2)
-        sc1.metric("Total Penjualan (Revenue KSJ)", f"Rp {payslip_data['Total Selling']:,}")
-        sc2.metric("Total Hari Aktif", f"{payslip_data['Active Days']} Hari")
+        sc1.metric("Total Selling", f"Rp {payslip_data['Total Selling']:,}")
+        sc2.metric("Total Active Days", f"{payslip_data['Active Days']} Hari")
         st.markdown("---")
-        st.subheader("Rincian Gaji")
-        st.markdown(f"**Insentif Penjualan:** `Rp {payslip_data['Selling Incentive']:,}`")
-        st.markdown(f"**Insentif Kehadiran:** `Rp {payslip_data['Attendance Incentive']:,}`")
+        st.subheader("Detail")
+        st.markdown(f"**Selling Incentive:** `Rp {payslip_data['Selling Incentive']:,}`")
+        st.markdown(f"**Attendance Incentive:** `Rp {payslip_data['Attendance Incentive']:,}`")
         
         # PERUBAHAN: Tampilkan tabel rincian jika ada (berlaku untuk semua area sekarang)
         if daily_details_df is not None and not daily_details_df.empty:
-            st.markdown("###### Rincian Insentif Kehadiran Harian:")
-            st.dataframe(daily_details_df.style.format({"Penjualan Harian": "Rp {:,.0f}", "Gaji Harian": "Rp {:,.0f}"}), use_container_width=True, hide_index=True)
+            st.markdown("###### Daily Incentive Detail:")
+            st.dataframe(daily_details_df.style.format({"Daily Total Selling": "Rp {:,.0f}", "Daily Selling Fee": "Rp {:,.0f}"}), use_container_width=True, hide_index=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         print_button_html = """<button onclick="window.print()" style="padding:10px 20px; font-size:16px; cursor:pointer; border-radius:8px; border:none; background-color:#4CAF50; color:white;">🖨️ PRINT</button>"""
