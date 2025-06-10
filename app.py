@@ -572,7 +572,7 @@ def get_daily_incentive_sby_smg(daily_selling):
     elif daily_selling >= 1040001: return 60000
     return 0
 
-# --- FUNGSI UTAMA PAYROLL MANAGEMENT (DENGAN FITUR VIEW DETAIL) ---
+# --- FUNGSI UTAMA PAYROLL MANAGEMENT (DENGAN RINCIAN UNTUK SEMUA AREA) ---
 
 def display_payroll_management():
     # State untuk mengontrol tampilan antara tabel utama dan detail slip gaji
@@ -611,9 +611,12 @@ def display_payroll_management():
         st.subheader("Rincian Gaji")
         st.markdown(f"**Insentif Penjualan:** `Rp {payslip_data['Selling Incentive']:,}`")
         st.markdown(f"**Insentif Kehadiran:** `Rp {payslip_data['Attendance Incentive']:,}`")
-        if payslip_data['Area'] in ['Surabaya', 'Semarang'] and daily_details_df is not None and not daily_details_df.empty:
+        
+        # PERUBAHAN: Tampilkan tabel rincian jika ada (berlaku untuk semua area sekarang)
+        if daily_details_df is not None and not daily_details_df.empty:
             st.markdown("###### Rincian Insentif Kehadiran Harian:")
             st.dataframe(daily_details_df.style.format({"Penjualan Harian": "Rp {:,.0f}", "Gaji Harian": "Rp {:,.0f}"}), use_container_width=True, hide_index=True)
+        
         st.markdown("<br>", unsafe_allow_html=True)
         print_button_html = """<button onclick="window.print()" style="padding:10px 20px; font-size:16px; cursor:pointer; border-radius:8px; border:none; background-color:#4CAF50; color:white;">🖨️ PRINT</button>"""
         st.components.v1.html(print_button_html, height=50)
@@ -649,6 +652,7 @@ def display_payroll_management():
                 st.warning("No sales data found for the selected week and location filters.")
                 return
 
+            # ... (Blok perhitungan payroll tidak berubah) ...
             payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(total_cups_sold=('cups', 'sum'), total_selling=('selling', 'sum'), active_days=('date', 'nunique')).reset_index()
             payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
             payroll_summary['attendance_incentive'] = 0.0
@@ -668,45 +672,53 @@ def display_payroll_management():
             
             payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
             
+            numeric_cols = ['total_selling', 'selling_incentive', 'attendance_incentive', 'accumulated_fee']
+            payroll_summary[numeric_cols] = payroll_summary[numeric_cols].fillna(0).astype(int)
+
             display_df = payroll_summary.rename(columns={'ridername': 'Rider Name', 'area': 'Area', 'total_cups_sold': 'Total Cups Sold', 'total_selling': 'Total Selling', 'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive', 'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'})
             display_df['Week'] = selected_week
 
+            # ... (Tampilan tabel utama tidak berubah) ...
             st.markdown("---")
             st.subheader(f"Payroll Summary for Week {selected_week}")
-            
-            # Siapkan dataframe untuk editor
             editor_df = display_df.copy()
-            # Format kolom angka menjadi string Rupiah untuk tampilan anti-gagal
-            editor_df['Total Selling'] = editor_df['Total Selling'].apply(lambda x: f"Rp {x:,.0f}")
-            editor_df['Selling Incentive'] = editor_df['Selling Incentive'].apply(lambda x: f"Rp {x:,.0f}")
-            editor_df['Attendance Incentive'] = editor_df['Attendance Incentive'].apply(lambda x: f"Rp {x:,.0f}")
-            editor_df['Accumulated Fee'] = editor_df['Accumulated Fee'].apply(lambda x: f"Rp {x:,.0f}")
+            editor_df['Total Selling'] = editor_df['Total Selling'].apply(lambda x: f"Rp {x:,}")
+            editor_df['Selling Incentive'] = editor_df['Selling Incentive'].apply(lambda x: f"Rp {x:,}")
+            editor_df['Attendance Incentive'] = editor_df['Attendance Incentive'].apply(lambda x: f"Rp {x:,}")
+            editor_df['Accumulated Fee'] = editor_df['Accumulated Fee'].apply(lambda x: f"Rp {x:,}")
             editor_df['Detail'] = False
-            
             cols_to_display = ['Rider Name', 'Area', 'Total Cups Sold', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee', 'Detail']
             disabled_cols = [col for col in cols_to_display if col != 'Detail']
-
-            edited_df_result = st.data_editor(
-                editor_df[cols_to_display],
-                use_container_width=True, hide_index=True, column_order=cols_to_display, disabled=disabled_cols,
-                column_config={"Detail": st.column_config.CheckboxColumn(help="Centang untuk melihat detail slip gaji", default=False)}
-            )
+            edited_df_result = st.data_editor(editor_df[cols_to_display], use_container_width=True, hide_index=True, column_order=cols_to_display, disabled=disabled_cols, column_config={"Detail": st.column_config.CheckboxColumn(help="Centang untuk melihat detail slip gaji", default=False)})
 
             selected_rows = edited_df_result[edited_df_result['Detail']]
             if not selected_rows.empty:
                 selected_index = selected_rows.index[0]
                 payslip_data = display_df.loc[selected_index]
                 st.session_state.viewing_payslip_data = payslip_data.to_dict()
+                
+                # --- PERUBAHAN LOGIKA DIMULAI DI SINI ---
+                # Ambil data transaksi harian untuk rider yang dipilih
+                rider_transactions = final_filtered_df[(final_filtered_df['ridername'] == payslip_data['Rider Name']) & (final_filtered_df['area'] == payslip_data['Area'])].copy()
+                daily_sales_detail = rider_transactions.groupby(rider_transactions['date'].dt.date)['selling'].sum().reset_index()
+                
                 if payslip_data['Area'] in ['Surabaya', 'Semarang']:
-                    daily_df = final_filtered_df[(final_filtered_df['ridername'] == payslip_data['Rider Name']) & (final_filtered_df['area'] == payslip_data['Area'])].copy()
-                    daily_sales_detail = daily_df.groupby(daily_df['date'].dt.date)['selling'].sum().reset_index()
+                    # Logika SBY/SMG: gaji harian dihitung dari penjualan harian
                     daily_sales_detail['Gaji Harian'] = daily_sales_detail['selling'].apply(get_daily_incentive_sby_smg)
-                    daily_details_df = daily_sales_detail.rename(columns={'date': 'Tanggal', 'selling': 'Penjualan Harian'})
-                    daily_details_df['Tanggal'] = pd.to_datetime(daily_details_df['Tanggal']).dt.strftime('%d %B %Y')
-                    daily_details_df['Hari'] = pd.to_datetime(daily_details_df['Tanggal'], format='%d %B %Y').dt.day_name()
-                    st.session_state.daily_details_for_payslip = daily_details_df[['Hari', 'Tanggal', 'Penjualan Harian', 'Gaji Harian']]
-                else:
-                    st.session_state.daily_details_for_payslip = None
+                else: # Logika JKT/BDG
+                    # Tarif harian tetap, didapat dari total insentif dibagi hari aktif
+                    # Ditambah pengecekan agar tidak error jika hari aktif = 0
+                    if payslip_data['Active Days'] > 0:
+                        fixed_daily_rate = payslip_data['Attendance Incentive'] / payslip_data['Active Days']
+                    else:
+                        fixed_daily_rate = 0
+                    daily_sales_detail['Gaji Harian'] = fixed_daily_rate
+                
+                daily_details_df = daily_sales_detail.rename(columns={'date': 'Tanggal', 'selling': 'Penjualan Harian'})
+                daily_details_df['Tanggal'] = pd.to_datetime(daily_details_df['Tanggal']).dt.strftime('%d %B %Y')
+                daily_details_df['Hari'] = pd.to_datetime(daily_details_df['Tanggal'], format='%d %B %Y').dt.day_name()
+                st.session_state.daily_details_for_payslip = daily_details_df[['Hari', 'Tanggal', 'Penjualan Harian', 'Gaji Harian']]
+                
                 st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
