@@ -533,8 +533,81 @@ def display_payroll_management():
         return
     st.markdown("---")
     st.header("💸 Payroll Management")
-    st.info("This module is currently under development.")
-    st.image("https://media.tenor.com/p4sS5_nB1vEAAAAC/spongebob-money.gif", width=300)
+
+    st.subheader("Section 1: Weekly Payroll")
+    
+    df = st.session_state["main_df"]
+    
+    # 1. Buat filter "Week" dengan pilihan tunggal
+    all_weeks = sorted(df['week'].unique())
+    selected_week = st.selectbox(
+        "Select a Week to Calculate Payroll", 
+        options=all_weeks, 
+        index=None, 
+        placeholder="Choose a week"
+    )
+
+    # 2. Jika week sudah dipilih, proses data
+    if selected_week:
+        # Filter data berdasarkan minggu yang dipilih
+        weekly_df = df[df['week'] == selected_week].copy()
+
+        if weekly_df.empty:
+            st.info(f"No sales data found for week {selected_week}.")
+            return
+
+        # Agregasi data per Rider
+        # Hitung total cups dan jumlah hari aktif (berdasarkan tanggal unik)
+        payroll_summary = weekly_df.groupby('ridername').agg(
+            total_cups_sold=('cups', 'sum'),
+            active_days=('date', 'nunique')
+        ).reset_index()
+
+        # 3. Hitung insentif menggunakan fungsi yang sudah dibuat
+        # Bagian A: Selling Incentive
+        payroll_summary['selling_incentive'] = payroll_summary['total_cups_sold'].apply(calculate_selling_incentive)
+        
+        # Bagian B: Attendance Incentive
+        payroll_summary['attendance_incentive'] = payroll_summary.apply(
+            lambda row: calculate_attendance_incentive(row['total_cups_sold'], row['active_days']),
+            axis=1
+        )
+
+        # Siapkan DataFrame final untuk ditampilkan
+        display_df = payroll_summary.rename(columns={
+            'ridername': 'Rider Name',
+            'total_cups_sold': 'Total Cups Sold',
+            'selling_incentive': 'Selling Incentive',
+            'attendance_incentive': 'Attendance Incentive'
+        })
+
+        # Pilih dan urutkan kolom sesuai permintaan
+        final_cols = ['Rider Name', 'Total Cups Sold', 'Selling Incentive', 'Attendance Incentive']
+        display_df = display_df[final_cols]
+        
+        st.markdown("---")
+        st.subheader(f"Payroll Summary for Week {selected_week}")
+
+        # Tampilkan tabel dengan format mata uang
+        st.dataframe(
+            display_df.style.format({
+                "Selling Incentive": "Rp {:,.0f}",
+                "Attendance Incentive": "Rp {:,.0f}"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Tambahkan tombol download
+        st.download_button(
+            label="📥 Export Payroll Data to Excel",
+            data=to_excel(display_df),
+            file_name=f"payroll_week_{selected_week}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    else:
+        st.info("Please select a week to view the payroll report.")
 
 # --- MAIN APPLICATION FLOW ---
 if "logged_in" not in st.session_state:
