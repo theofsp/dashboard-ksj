@@ -594,179 +594,146 @@ def get_daily_incentive_sby_smg(daily_selling):
         return 60000
     return 0
 
-def display_payslip_dialog(payslip_data, daily_details_df=None):
-    """Menampilkan dialog pop-up untuk slip gaji."""
-    with st.dialog("Detail Slip Gaji", width="large"):
-        # --- Header ---
+def display_payroll_management():
+    # State untuk mengontrol tampilan antara tabel utama dan detail slip gaji
+    if 'viewing_payslip_data' not in st.session_state:
+        st.session_state.viewing_payslip_data = None
+        st.session_state.daily_details_for_payslip = None
+
+    # TAMPILAN 2: DETAIL SLIP GAJI
+    if st.session_state.viewing_payslip_data is not None:
+        payslip_data = st.session_state.viewing_payslip_data
+        daily_details_df = st.session_state.daily_details_for_payslip
+
+        # Tombol untuk kembali ke tabel ringkasan
+        if st.button("⬅️ Back to Payroll Summary"):
+            st.session_state.viewing_payslip_data = None
+            st.session_state.daily_details_for_payslip = None
+            st.rerun()
+        
+        st.markdown("---")
+        # --- Layout Slip Gaji (logika dari fungsi dialog lama) ---
         col1, col2 = st.columns([5, 1])
         with col1:
             st.subheader("SLIP GAJI MINGGUAN")
         with col2:
-            try:
-                st.image("BLITZ LOGO.png", width=60)
-            except FileNotFoundError:
-                pass # Jangan tampilkan gambar jika file tidak ada
+            try: st.image("BLITZ LOGO.png", width=60)
+            except: pass
         st.markdown("---")
-
-        # --- Informasi Dasar ---
         c1, c2, c3 = st.columns(3)
         c1.metric("NAMA RIDER", payslip_data['Rider Name'])
         c2.metric("PERIODE MINGGU", f"Minggu ke-{payslip_data['Week']}")
         c3.metric("AREA", payslip_data['Area'])
         st.markdown("---")
-
-        # --- Ringkasan Gaji ---
         st.markdown(f"#### Total Gaji: **Rp {int(payslip_data['Accumulated Fee']):,.0f}**")
         sc1, sc2 = st.columns(2)
         sc1.metric("Total Penjualan (Revenue KSJ)", f"Rp {int(payslip_data['Total Selling']):,.0f}")
         sc2.metric("Total Hari Aktif", f"{int(payslip_data['Active Days'])} Hari")
         st.markdown("---")
-
-        # --- Rincian Gaji ---
         st.subheader("Rincian Gaji")
-        
         st.markdown(f"**Insentif Penjualan:** `Rp {int(payslip_data['Selling Incentive']):,.0f}`")
         st.markdown(f"**Insentif Kehadiran:** `Rp {int(payslip_data['Attendance Incentive']):,.0f}`")
 
-        # Detail Insentif Kehadiran (Khusus SBY/SMG)
         if payslip_data['Area'] in ['Surabaya', 'Semarang'] and daily_details_df is not None:
             st.markdown("###### Rincian Insentif Kehadiran Harian:")
-            st.dataframe(
-                daily_details_df.style.format({
-                    "Penjualan Harian": "Rp {:,.0f}",
-                    "Gaji Harian": "Rp {:,.0f}"
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(daily_details_df.style.format({"Penjualan Harian": "Rp {:,.0f}","Gaji Harian": "Rp {:,.0f}"}),
+                use_container_width=True, hide_index=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         print_button_html = """<button onclick="window.print()" style="padding:10px 20px; font-size:16px; cursor:pointer; border-radius:8px; border:none; background-color:#4CAF50; color:white;">🖨️ PRINT</button>"""
         st.components.v1.html(print_button_html, height=50)
 
-def display_payroll_management():
-    if st.button("⬅️ Back to Menu"):
-        set_view('main_menu')
-        return
-    st.markdown("---")
-    st.header("💸 Payroll Management")
-    st.subheader("Weekly Payroll")
-    df = st.session_state["main_df"]
-    
-    selected_week = st.selectbox(
-        "Select a Week to Calculate Payroll", 
-        options=sorted(df['week'].unique()), 
-        index=None, 
-        placeholder="Choose a week"
-    )
-
-    if selected_week:
-        time_filtered_df = df[df['week'] == selected_week].copy()
-        st.markdown("---")
-        st.subheader("Geographic Filters (Optional)")
-
-        # ... (Blok filter geografis tidak berubah, saya persingkat di sini)
-        area_options = sorted(time_filtered_df['area'].unique())
-        selected_areas = st.multiselect("Select Area(s)", options=area_options, placeholder="Leave empty to select all")
-        area_filtered_df = time_filtered_df[time_filtered_df['area'].isin(selected_areas)] if selected_areas else time_filtered_df
-        city_options = sorted(area_filtered_df['city'].unique())
-        selected_cities = st.multiselect("Select City/Cities", options=city_options, placeholder="Leave empty to select all")
-        city_filtered_df = area_filtered_df[area_filtered_df['city'].isin(selected_cities)] if selected_cities else area_filtered_df
-        district_options = sorted(city_filtered_df['district'].unique())
-        selected_districts = st.multiselect("Select District(s)", options=district_options, placeholder="Leave empty to select all")
-        final_filtered_df = city_filtered_df[city_filtered_df['district'].isin(selected_districts)] if selected_districts else city_filtered_df
-        
-        if final_filtered_df.empty:
-            st.warning("No sales data found for the selected week and location filters.")
-            return
-
-        # --- PERHITUNGAN PAYROLL (Tidak Berubah) ---
-        payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(
-            total_selling=('selling', 'sum'),
-            active_days=('date', 'nunique')
-        ).reset_index()
-        payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
-        payroll_summary['attendance_incentive'] = 0.0
-        jkt_bdg_mask = payroll_summary['area'].isin(['Jakarta', 'Bandung'])
-        if jkt_bdg_mask.any():
-            payroll_summary.loc[jkt_bdg_mask, 'attendance_incentive'] = payroll_summary[jkt_bdg_mask].apply(
-                lambda row: calculate_attendance_incentive_jkt_bdg(row['total_selling'], row['active_days']), axis=1)
-        sby_smg_mask = payroll_summary['area'].isin(['Surabaya', 'Semarang'])
-        if sby_smg_mask.any():
-            sby_smg_df = final_filtered_df[final_filtered_df['area'].isin(['Surabaya', 'Semarang'])].copy()
-            sby_smg_df['daily_incentive'] = sby_smg_df['selling'].apply(get_daily_incentive_sby_smg)
-            weekly_attendance_sby_smg = sby_smg_df.groupby(['ridername', 'area'])['daily_incentive'].sum()
-            temp_summary = payroll_summary.set_index(['ridername', 'area'])
-            temp_summary['attendance_incentive'].update(weekly_attendance_sby_smg)
-            payroll_summary = temp_summary.reset_index()
-        payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
-        
-        display_df = payroll_summary.rename(columns={
-            'ridername': 'Rider Name', 'area': 'Area', 'total_selling': 'Total Selling',
-            'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive',
-            'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'
-        })
-        display_df['Week'] = selected_week
-        
-        # --- [PERUBAHAN BESAR] TAMPILAN TABEL KUSTOM & TOMBOL DETAIL ---
-        st.markdown("---")
-        st.subheader(f"Payroll Summary for Week {selected_week}")
-
-        # Membuat Header Tabel secara Manual
-        header_cols = st.columns([2, 1, 2, 1, 2, 2, 2, 1])
-        header_fields = ['Rider Name', 'Area', 'Total Selling', 'Days', 'Selling Incentive', 'Attendance Inc.', 'Total Fee', 'Detail']
-        for col, field in zip(header_cols, header_fields):
-            col.markdown(f"**{field}**")
-
-        st.markdown("---") # Garis pemisah antara header dan data
-
-        # Looping untuk setiap baris data untuk membuat tabel kustom
-        for index, row in display_df.iterrows():
-            # Mengubah data numerik menjadi format string Rupiah
-            total_selling_str = f"Rp {int(row['Total Selling']):,.0f}"
-            selling_inc_str = f"Rp {int(row['Selling Incentive']):,.0f}"
-            attendance_inc_str = f"Rp {int(row['Attendance Incentive']):,.0f}"
-            total_fee_str = f"Rp {int(row['Accumulated Fee']):,.0f}"
-
-            data_cols = st.columns([2, 1, 2, 1, 2, 2, 2, 1])
-            data_cols[0].write(row['Rider Name'])
-            data_cols[1].write(row['Area'])
-            data_cols[2].write(total_selling_str)
-            data_cols[3].write(row['Active Days'])
-            data_cols[4].write(selling_inc_str)
-            data_cols[5].write(attendance_inc_str)
-            data_cols[6].write(total_fee_str)
-            
-            # Tombol "View Detail" untuk setiap baris
-            button_col = data_cols[7]
-            if button_col.button("👁️", key=f"view_{index}", help="VIEW DETAIL"):
-                daily_details_df = None
-                if row['Area'] in ['Surabaya', 'Semarang']:
-                    daily_df = final_filtered_df[
-                        (final_filtered_df['ridername'] == row['Rider Name']) & 
-                        (final_filtered_df['area'] == row['Area'])
-                    ].copy()
-                    daily_df['Gaji Harian'] = daily_df['selling'].apply(get_daily_incentive_sby_smg)
-                    daily_details_df = daily_df.rename(columns={
-                        'date': 'Tanggal', 'day': 'Hari', 'selling': 'Penjualan Harian'
-                    })
-                    daily_details_df = daily_details_df[['Hari', 'Tanggal', 'Penjualan Harian', 'Gaji Harian']]
-                    daily_details_df['Tanggal'] = daily_details_df['Tanggal'].dt.strftime('%d %B %Y')
-
-                display_payslip_dialog(row, daily_details_df)
-        
-        # Tombol download tetap ada di paling bawah
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(
-            label="📥 Export Payroll Data to Excel",
-            data=to_excel(display_df[['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']]),
-            file_name=f"payroll_week_{selected_week}_filtered.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
-
+    # TAMPILAN 1: TABEL RINGKASAN PAYROLL (Default)
     else:
-        st.info("Please select a week to view the payroll report.")
+        if st.button("⬅️ Back to Menu"):
+            st.session_state.viewing_payslip_data = None
+            st.session_state.daily_details_for_payslip = None
+            set_view('main_menu')
+            return
+        st.markdown("---")
+        st.header("💸 Payroll Management")
+        st.subheader("Weekly Payroll")
+        df = st.session_state["main_df"]
+        
+        selected_week = st.selectbox("Select a Week to Calculate Payroll", options=sorted(df['week'].unique()), index=None, placeholder="Choose a week")
+
+        if selected_week:
+            time_filtered_df = df[df['week'] == selected_week].copy()
+            st.markdown("---")
+            st.subheader("Geographic Filters (Optional)")
+
+            area_options = sorted(time_filtered_df['area'].unique())
+            selected_areas = st.multiselect("Select Area(s)", options=area_options, placeholder="Leave empty to select all")
+            area_filtered_df = time_filtered_df[time_filtered_df['area'].isin(selected_areas)] if selected_areas else time_filtered_df
+            city_options = sorted(area_filtered_df['city'].unique())
+            selected_cities = st.multiselect("Select City/Cities", options=city_options, placeholder="Leave empty to select all")
+            city_filtered_df = area_filtered_df[area_filtered_df['city'].isin(selected_cities)] if selected_cities else area_filtered_df
+            district_options = sorted(city_filtered_df['district'].unique())
+            selected_districts = st.multiselect("Select District(s)", options=district_options, placeholder="Leave empty to select all")
+            final_filtered_df = city_filtered_df[city_filtered_df['district'].isin(selected_districts)] if selected_districts else city_filtered_df
+            
+            if final_filtered_df.empty:
+                st.warning("No sales data found for the selected week and location filters.")
+                return
+
+            # --- Perhitungan Payroll (Tidak Berubah) ---
+            payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(total_selling=('selling', 'sum'), active_days=('date', 'nunique')).reset_index()
+            payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
+            payroll_summary['attendance_incentive'] = 0.0
+            jkt_bdg_mask = payroll_summary['area'].isin(['Jakarta', 'Bandung'])
+            if jkt_bdg_mask.any():
+                payroll_summary.loc[jkt_bdg_mask, 'attendance_incentive'] = payroll_summary[jkt_bdg_mask].apply(
+                    lambda row: calculate_attendance_incentive_jkt_bdg(row['total_selling'], row['active_days']), axis=1)
+            sby_smg_mask = payroll_summary['area'].isin(['Surabaya', 'Semarang'])
+            if sby_smg_mask.any():
+                sby_smg_df = final_filtered_df[final_filtered_df['area'].isin(['Surabaya', 'Semarang'])].copy()
+                sby_smg_df['daily_incentive'] = sby_smg_df['selling'].apply(get_daily_incentive_sby_smg)
+                weekly_attendance_sby_smg = sby_smg_df.groupby(['ridername', 'area'])['daily_incentive'].sum()
+                temp_summary = payroll_summary.set_index(['ridername', 'area'])
+                temp_summary['attendance_incentive'].update(weekly_attendance_sby_smg)
+                payroll_summary = temp_summary.reset_index()
+            payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
+            
+            display_df = payroll_summary.rename(columns={'ridername': 'Rider Name', 'area': 'Area', 'total_selling': 'Total Selling', 'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive', 'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'})
+            display_df['Week'] = selected_week
+            
+            # --- Tampilan Tabel Kustom ---
+            st.markdown("---")
+            st.subheader(f"Payroll Summary for Week {selected_week}")
+            header_cols = st.columns([2, 1, 2, 1, 2, 2, 2, 1])
+            header_fields = ['Rider Name', 'Area', 'Total Selling', 'Days', 'Selling Incentive', 'Attendance Inc.', 'Total Fee', 'Detail']
+            for col, field in zip(header_cols, header_fields):
+                col.markdown(f"**{field}**")
+            st.markdown("---")
+
+            for index, row in display_df.iterrows():
+                data_cols = st.columns([2, 1, 2, 1, 2, 2, 2, 1])
+                data_cols[0].write(row['Rider Name'])
+                data_cols[1].write(row['Area'])
+                data_cols[2].write(f"Rp {int(row['Total Selling']):,.0f}")
+                data_cols[3].write(row['Active Days'])
+                data_cols[4].write(f"Rp {int(row['Selling Incentive']):,.0f}")
+                data_cols[5].write(f"Rp {int(row['Attendance Incentive']):,.0f}")
+                data_cols[6].write(f"Rp {int(row['Accumulated Fee']):,.0f}")
+                
+                if data_cols[7].button("👁️", key=f"view_{index}", help="VIEW DETAIL"):
+                    st.session_state.viewing_payslip_data = row
+                    if row['Area'] in ['Surabaya', 'Semarang']:
+                        daily_df = final_filtered_df[(final_filtered_df['ridername'] == row['Rider Name']) & (final_filtered_df['area'] == row['Area'])].copy()
+                        daily_df['Gaji Harian'] = daily_df['selling'].apply(get_daily_incentive_sby_smg)
+                        daily_details_df = daily_df.rename(columns={'date': 'Tanggal', 'day': 'Hari', 'selling': 'Penjualan Harian'})
+                        daily_details_df = daily_details_df[['Hari', 'Tanggal', 'Penjualan Harian', 'Gaji Harian']]
+                        daily_details_df['Tanggal'] = daily_details_df['Tanggal'].dt.strftime('%d %B %Y')
+                        st.session_state.daily_details_for_payslip = daily_details_df
+                    else:
+                        st.session_state.daily_details_for_payslip = None
+                    st.rerun()
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.download_button(label="📥 Export Payroll Data to Excel", data=to_excel(display_df[['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee']]), file_name=f"payroll_week_{selected_week}_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+        else:
+            st.info("Please select a week to view the payroll report.")
 
 # --- MAIN APPLICATION FLOW ---
 if "logged_in" not in st.session_state:
