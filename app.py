@@ -727,6 +727,12 @@ def display_payroll_management():
             st.markdown("<br>", unsafe_allow_html=True)
             st.download_button(label="📥 Export Payroll Data to Excel", data=to_excel(display_df[cols_to_display[:-1]]), file_name=f"payroll_week_{selected_week}_filtered.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
+# --- KODE UNTUK SUBSECTION MONTHLY BONUS ---
+        st.markdown("---")
+        st.subheader("Monthly Bonus")
+        st.info("This feature is under development.")
+# -----------------------------------------
+        
         else:
             st.info("Please select a week to view the payroll report.")
 
