@@ -75,7 +75,7 @@ def display_main_menu():
         with st.container(border=True):
             st.subheader("📊 All Data")
             st.markdown("View all raw data with interactive filters, plus weekly productivity graphs and daily sales analysis.")
-            if st.button("Open Report", key="grup1_button", use_container_width=True):
+            if st.button("Open Module", key="grup1_button", use_container_width=True):
                 # Logika untuk inisialisasi filter grup 1
                 df = st.session_state["main_df"]
                 st.session_state.grup1_filter_options = {}
@@ -89,14 +89,14 @@ def display_main_menu():
         with st.container(border=True):
             st.subheader("🗓️ Business Dashboard")
             st.markdown("View a consolidated dashboard of business performance, position, and seller retention.")
-            if st.button("Open Report", key="grup2_button", use_container_width=True):
+            if st.button("Open Module", key="grup2_button", use_container_width=True):
                 set_view('grup_2')
 
     with row1_col3:
         with st.container(border=True):
             st.subheader("📍 Area & Outlet Analysis")
             st.markdown("Drill down into area-specific performance, with detailed location and outlet-level breakdowns.")
-            if st.button("Open Report", key="area_button", use_container_width=True):
+            if st.button("Open Module", key="area_button", use_container_width=True):
                 set_view('area_analysis')
 
     # Baris kedua untuk kartu selanjutnya
