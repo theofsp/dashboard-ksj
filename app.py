@@ -53,7 +53,7 @@ def load_and_process_main_data():
 
     df.columns = [col.strip().replace(" ", "").replace("#", "").lower() for col in df.columns]
     if 'date' in df.columns:
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.normalize()
         df['day'] = df['date'].dt.day_name()
     if 'week' not in df.columns and 'date' in df.columns:
         df['week'] = df['date'].dt.isocalendar().week.astype(int)
@@ -527,6 +527,10 @@ def display_area_analysis():
         else:
             st.info("No supply/demand data available for the current filter selection.")
 
+# ===================================================================
+# --- BLOK KODE PAYROLL FINAL ---
+# ===================================================================
+
 # --- FUNGSI KALKULASI PAYROLL BARU (BERBASIS SELLING) ---
 
 def calculate_selling_incentive_v2(total_selling):
@@ -594,6 +598,8 @@ def get_daily_incentive_sby_smg(daily_selling):
         return 60000
     return 0
 
+# --- FUNGSI UTAMA PAYROLL MANAGEMENT (VERSI FINAL) ---
+
 def display_payroll_management():
     # State untuk mengontrol tampilan antara tabel utama dan detail slip gaji
     if 'viewing_payslip_data' not in st.session_state:
@@ -611,7 +617,7 @@ def display_payroll_management():
             st.rerun()
         
         st.markdown("---")
-        # --- Layout Slip Gaji ---
+        # Layout Slip Gaji
         col1, col2 = st.columns([5, 1])
         with col1: st.subheader("SLIP GAJI MINGGUAN")
         with col2:
@@ -654,7 +660,7 @@ def display_payroll_management():
             time_filtered_df = df[df['week'] == selected_week].copy()
             st.markdown("---")
             st.subheader("Geographic Filters (Optional)")
-            # ... (Blok filter tidak berubah) ...
+            
             area_options = sorted(time_filtered_df['area'].unique())
             selected_areas = st.multiselect("Select Area(s)", options=area_options, placeholder="Leave empty to select all")
             area_filtered_df = time_filtered_df[time_filtered_df['area'].isin(selected_areas)] if selected_areas else time_filtered_df
@@ -669,7 +675,6 @@ def display_payroll_management():
                 st.warning("No sales data found for the selected week and location filters.")
                 return
 
-            # --- Perhitungan Payroll (Tidak Berubah) ---
             payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(total_selling=('selling', 'sum'), active_days=('date', 'nunique')).reset_index()
             payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
             payroll_summary['attendance_incentive'] = 0.0
@@ -687,7 +692,6 @@ def display_payroll_management():
                 payroll_summary = temp_summary.reset_index()
             payroll_summary['accumulated_fee'] = payroll_summary['selling_incentive'] + payroll_summary['attendance_incentive']
             
-            # FIX: Konversi semua kolom finansial menjadi integer SETELAH perhitungan selesai
             numeric_cols = ['total_selling', 'selling_incentive', 'attendance_incentive', 'accumulated_fee']
             payroll_summary[numeric_cols] = payroll_summary[numeric_cols].fillna(0).astype(int)
 
@@ -698,23 +702,18 @@ def display_payroll_management():
             st.subheader(f"Payroll Summary for Week {selected_week}")
             
             editor_df = display_df.copy()
-            editor_df['Pilih'] = False
+            editor_df['Detail'] = False
             
-            cols_to_display = ['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee', 'Pilih']
-            disabled_cols = [col for col in cols_to_display if col != 'Pilih']
+            cols_to_display = ['Rider Name', 'Area', 'Total Selling', 'Active Days', 'Selling Incentive', 'Attendance Incentive', 'Accumulated Fee', 'Detail']
+            disabled_cols = [col for col in cols_to_display if col != 'Detail']
 
             edited_df = st.data_editor(
                 editor_df,
                 use_container_width=True, hide_index=True, column_order=cols_to_display, disabled=disabled_cols,
-                column_config={
-                    "Total Selling": st.column_config.NumberColumn(format="Rp %,d"),
-                    "Selling Incentive": st.column_config.NumberColumn(format="Rp %,d"),
-                    "Attendance Incentive": st.column_config.NumberColumn(format="Rp %,d"),
-                    "Accumulated Fee": st.column_config.NumberColumn(format="Rp %,d"),
-                }
+                column_config={"Total Selling": st.column_config.NumberColumn(format="Rp %,d"), "Selling Incentive": st.column_config.NumberColumn(format="Rp %,d"), "Attendance Incentive": st.column_config.NumberColumn(format="Rp %,d"), "Accumulated Fee": st.column_config.NumberColumn(format="Rp %,d"), "Detail": st.column_config.CheckboxColumn(help="Centang untuk melihat detail slip gaji")}
             )
 
-            selected_rows = edited_df[edited_df['Pilih']]
+            selected_rows = edited_df[edited_df['Detail']]
             if not selected_rows.empty:
                 selected_index = selected_rows.index[0]
                 payslip_data = display_df.loc[selected_index]
