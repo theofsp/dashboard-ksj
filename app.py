@@ -21,15 +21,45 @@ def to_excel(df: pd.DataFrame):
     return processed_data
 
 def check_login(username, password):
-    # This should be replaced with st.secrets for production
-    if username == "Blitz" and password == "ksj2025":
-        st.session_state["logged_in"] = True
-        st.session_state["username"] = username
-        st.rerun()
-    else:
+    # Akses tabel 'users' dari secrets
+    # st.secrets.users akan mengembalikan dictionary seperti {'blitz': 'ksj2025'}
+    all_users = st.secrets["users"]
+
+    # Periksa apakah username yang diinput ada di dalam daftar users di secrets
+    if username in all_users:
+        # Jika username ada, periksa apakah passwordnya cocok
+        if all_users[username] == password:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+            return True # Login berhasil
+    
+    # Jika username tidak ada atau password salah
+    st.session_state["logged_in"] = False
+    st.session_state.pop("username", None)
+    st.error("Incorrect Username or Password!")
+    return False # Login gagal
+
+# --- Sisa kode aplikasi Anda (form login, halaman utama, dll) tetap sama ---
+
+# Cek apakah pengguna sudah login atau belum
+if not st.session_state.get("logged_in", False):
+    st.title("Login Page")
+    input_username = st.text_input("Username").lower() # Opsi: ubah input ke huruf kecil
+    input_password = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        # Panggil fungsi check_login yang sudah diperbarui
+        if check_login(input_username, input_password):
+            st.rerun()
+else:
+    username = st.session_state.get("username", "User")
+    st.title(f"Welcome, {username}! 👋")
+    st.write("You are successfully logged in.")
+
+    if st.button("Logout"):
         st.session_state["logged_in"] = False
         st.session_state.pop("username", None)
-        st.error("Incorrect Username or Password!")
+        st.rerun()
 
 def logout():
     for key in list(st.session_state.keys()):
