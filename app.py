@@ -752,8 +752,6 @@ def display_ev_management():
     st.markdown("---")
     st.header("🛵 EV Management")
     st.info("This feature is under development.")
-    # Anda bisa menambahkan gambar yang relevan di sini jika mau
-    st.image("https://media.wired.com/photos/6595c25c156949365e7514ce/master/w_2560%2Cc_limit/EV-Bike-Rolling-Style-Gear.jpg", width=400)
 
 # --- MAIN APPLICATION FLOW ---
 if "logged_in" not in st.session_state:
