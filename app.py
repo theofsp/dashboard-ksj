@@ -25,9 +25,9 @@ def check_login(username, password):
     # st.secrets.users akan mengembalikan dictionary
     all_users = st.secrets["users"]
 
-    # Periksa apakah username yang diinput ada di dalam daftar users di secrets
+    # Username checking, pastikan sesuai dengan users di secrets
     if username in all_users:
-        # Jika username ada, periksa apakah passwordnya cocok
+        # Password checking
         if all_users[username] == password:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
@@ -266,14 +266,14 @@ def display_grup_2():
         city_list = ['All Cities'] + sorted(df_filtered_area['city'].unique().tolist())
         selected_city = st.selectbox("Select City", city_list, key="grup2_city")
 
-    # Filter data lebih lanjut
+    # Filter data turunan
     df_filtered_city = df_filtered_area[df_filtered_area['city'] == selected_city] if selected_city != 'All Cities' else df_filtered_area
     
     with filter_cols[2]:
         district_list = ['All Districts'] + sorted(df_filtered_city['district'].unique().tolist())
         selected_district = st.selectbox("Select District", district_list, key="grup2_district")
 
-    # Ini adalah DataFrame final yang akan digunakan oleh semua modul di bawah
+    # DataFrame final yang akan digunakan
     filtered_df = df_filtered_city[df_filtered_city['district'] == selected_district] if selected_district != 'All Districts' else df_filtered_city
     
     st.markdown("---")
@@ -282,7 +282,7 @@ def display_grup_2():
         st.warning("No data available for the current filter selection.")
         return
 
-    # --- SEMUA MODUL DI BAWAH INI SEKARANG MENGGUNAKAN 'filtered_df' ---
+    # --- SEMUA MODUL DI BAWAH INI MENGGUNAKAN 'filtered_df' ---
     
     st.subheader("Weekly Performance Summary")
     summary_df = filtered_df.groupby('week').agg(ksj_revenue=('selling', 'sum'),blitz_revenue=('revenue', 'sum'),active_sellers=('ridername', 'nunique'),total_cups=('cups', 'sum')).reset_index()
@@ -544,10 +544,10 @@ def display_area_analysis():
             st.info("No supply/demand data available for the current filter selection.")
 
 # ===================================================================
-# --- BLOK KODE PAYROLL FINAL (DENGAN VIEW DETAIL) ---
+# --- BLOK KODE PAYROLL
 # ===================================================================
 
-# --- FUNGSI KALKULASI PAYROLL (VERSI FINAL & AKURAT) ---
+# --- KALKULASI PAYROLL ---
 
 def calculate_selling_incentive_v2(total_selling):
     """(BAGIAN A - NASIONAL) Menghitung insentif penjualan berdasarkan total selling mingguan."""
@@ -588,7 +588,7 @@ def get_daily_incentive_sby_smg(daily_selling):
     elif daily_selling >= 1040001: return 60000
     return 0
 
-# --- FUNGSI UTAMA PAYROLL MANAGEMENT (DENGAN KOLOM RINCIAN LENGKAP) ---
+# --- PAYROLL MANAGEMENT ---
 
 def display_payroll_management():
     # State untuk mengontrol tampilan antara tabel utama dan detail slip gaji
@@ -596,7 +596,7 @@ def display_payroll_management():
         st.session_state.viewing_payslip_data = None
         st.session_state.daily_details_for_payslip = None
 
-    # TAMPILAN 2: DETAIL SLIP GAJI
+    # DETAIL SLIP GAJI
     if st.session_state.viewing_payslip_data is not None:
         payslip_data = st.session_state.viewing_payslip_data
         daily_details_df = st.session_state.daily_details_for_payslip
@@ -641,7 +641,7 @@ def display_payroll_management():
         print_button_html = """<button onclick="window.print()" style="padding:10px 20px; font-size:16px; cursor:pointer; border-radius:8px; border:none; background-color:#4CAF50; color:white;">🖨️ PRINT</button>"""
         st.components.v1.html(print_button_html, height=50)
 
-    # TAMPILAN 1: TABEL RINGKASAN PAYROLL (Default)
+    # TABEL RINGKASAN PAYROLL
     else:
         if st.button("⬅️ Back to Menu"):
             set_view('main_menu')
@@ -658,7 +658,7 @@ def display_payroll_management():
             st.markdown("---")
             st.subheader("Geographic Filters (Optional)")
             
-            # ... (Blok filter tidak berubah) ...
+            # ... (Blok filter) ...
             area_options = sorted(time_filtered_df['area'].unique())
             selected_areas = st.multiselect("Select Area(s)", options=area_options, placeholder="Leave empty to select all")
             area_filtered_df = time_filtered_df[time_filtered_df['area'].isin(selected_areas)] if selected_areas else time_filtered_df
@@ -673,7 +673,7 @@ def display_payroll_management():
                 st.warning("No sales data found for the selected week and location filters.")
                 return
 
-            # ... (Blok perhitungan payroll tidak berubah) ...
+            # ... (Blok perhitungan payroll) ...
             payroll_summary = final_filtered_df.groupby(['ridername', 'area']).agg(total_cups_sold=('cups', 'sum'), total_selling=('selling', 'sum'), active_days=('date', 'nunique')).reset_index()
             payroll_summary['selling_incentive'] = payroll_summary['total_selling'].apply(calculate_selling_incentive_v2)
             payroll_summary['attendance_incentive'] = 0.0
@@ -696,7 +696,7 @@ def display_payroll_management():
             display_df = payroll_summary.rename(columns={'ridername': 'Rider Name', 'area': 'Area', 'total_cups_sold': 'Total Cups Sold', 'total_selling': 'Total Selling', 'active_days': 'Active Days', 'selling_incentive': 'Selling Incentive', 'attendance_incentive': 'Attendance Incentive', 'accumulated_fee': 'Accumulated Fee'})
             display_df['Week'] = selected_week
 
-            # ... (Tampilan tabel utama tidak berubah) ...
+            # ... (Tampilan tabel utama) ...
             st.markdown("---")
             st.subheader(f"Payroll Summary for Week {selected_week}")
             editor_df = display_df.copy()
@@ -715,7 +715,7 @@ def display_payroll_management():
                 payslip_data = display_df.loc[selected_index]
                 st.session_state.viewing_payslip_data = payslip_data.to_dict()
                 
-                # --- PERUBAHAN LOGIKA UNTUK RINCIAN DETAIL ---
+                # --- LOGIKA UNTUK RINCIAN DETAIL ---
                 rider_transactions = final_filtered_df[(final_filtered_df['ridername'] == payslip_data['Rider Name']) & (final_filtered_df['area'] == payslip_data['Area'])].copy()
                 daily_sales_detail = rider_transactions.groupby(rider_transactions['date'].dt.date)['selling'].sum().reset_index()
                 
@@ -726,7 +726,7 @@ def display_payroll_management():
                     fixed_daily_rate = payslip_data['Attendance Incentive'] / payslip_data['Active Days'] if payslip_data['Active Days'] > 0 else 0
                     daily_sales_detail['Daily Attendance Incentive'] = fixed_daily_rate
                 
-                # Hitung Daily Selling Incentive (Prorata/Bagi Rata)
+                # Hitung Daily Selling Incentive (Prorate)
                 avg_daily_selling_incentive = payslip_data['Selling Incentive'] / payslip_data['Active Days'] if payslip_data['Active Days'] > 0 else 0
                 daily_sales_detail['Daily Selling Incentive'] = avg_daily_selling_incentive
                 
@@ -734,7 +734,7 @@ def display_payroll_management():
                 daily_details_df['Date'] = pd.to_datetime(daily_details_df['Date']).dt.strftime('%d %B %Y')
                 daily_details_df['Day'] = pd.to_datetime(daily_details_df['Date'], format='%d %B %Y').dt.day_name()
                 
-                # Susun ulang kolom sesuai permintaan
+                # Susun ulang kolom
                 final_detail_cols = ['Day', 'Date', 'Daily Selling', 'Daily Selling Incentive', 'Daily Attendance Incentive']
                 st.session_state.daily_details_for_payslip = daily_details_df[final_detail_cols]
                 
