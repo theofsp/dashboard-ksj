@@ -109,6 +109,14 @@ def display_main_menu():
             if st.button("Open Module", key="payroll_button", use_container_width=True):
                 set_view('payroll_management')
 
+    with row2_col2:
+        with st.container(border=True):
+            st.subheader("🛵 EV Management")
+            st.markdown("Monitor and manage Electric Vehicle assets and revenue from EV Deduction (Under Development).")
+            if st.button("Open Module", key="ev_button", use_container_width=True):
+                set_view('ev_management')
+
+
 def display_grup_1():
     if st.button("⬅️ Back to Menu"):
         set_view('main_menu')
@@ -736,6 +744,17 @@ def display_payroll_management():
         st.info("This feature is under development.")
 # -----------------------------------------
 
+def display_ev_management():
+    """Menampilkan halaman placeholder untuk EV Management."""
+    if st.button("⬅️ Back to Menu"):
+        set_view('main_menu')
+        return
+    st.markdown("---")
+    st.header("🛵 EV Management")
+    st.info("This feature is under development.")
+    # Anda bisa menambahkan gambar yang relevan di sini jika mau
+    st.image("https://media.wired.com/photos/6595c25c156949365e7514ce/master/w_2560%2Cc_limit/EV-Bike-Rolling-Style-Gear.jpg", width=400)
+
 # --- MAIN APPLICATION FLOW ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -784,3 +803,5 @@ else:
         display_area_analysis()
     elif current_view == "payroll_management":
         display_payroll_management()
+    elif current_view == "ev_management":
+        display_ev_management()
