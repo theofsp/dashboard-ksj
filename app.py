@@ -22,7 +22,7 @@ def to_excel(df: pd.DataFrame):
 
 def check_login(username, password):
     # Akses tabel 'users' dari secrets
-    # st.secrets.users akan mengembalikan dictionary seperti {'blitz': 'ksj2025'}
+    # st.secrets.users akan mengembalikan dictionary
     all_users = st.secrets["users"]
 
     # Periksa apakah username yang diinput ada di dalam daftar users di secrets
