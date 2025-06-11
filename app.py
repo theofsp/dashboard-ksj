@@ -39,28 +39,6 @@ def check_login(username, password):
     st.error("Incorrect Username or Password!")
     return False # Login gagal
 
-# --- Sisa kode aplikasi Anda (form login, halaman utama, dll) tetap sama ---
-
-# Cek apakah pengguna sudah login atau belum
-if not st.session_state.get("logged_in", False):
-    st.title("Login Page")
-    input_username = st.text_input("Username").lower() # Opsi: ubah input ke huruf kecil
-    input_password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        # Panggil fungsi check_login yang sudah diperbarui
-        if check_login(input_username, input_password):
-            st.rerun()
-else:
-    username = st.session_state.get("username", "User")
-    st.title(f"Welcome, {username}! 👋")
-    st.write("You are successfully logged in.")
-
-    if st.button("Logout"):
-        st.session_state["logged_in"] = False
-        st.session_state.pop("username", None)
-        st.rerun()
-
 def logout():
     for key in list(st.session_state.keys()):
         st.session_state.pop(key)
